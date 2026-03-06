@@ -1,0 +1,164 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Font Declarations ─────────────────────────────────────────── */
+@font-face {
+  font-family: "Cabinet Grotesk";
+  src: url("/assets/fonts/CabinetGrotesk-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Bricolage Grotesque";
+  src: url("/assets/fonts/BricolageGrotesque-Variable.woff2") format("woff2");
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@layer base {
+  :root {
+    --radius: 0.75rem;
+
+    /* ─── AgriTrace Nature/Earth Palette ─── */
+    /* Background: warm off-white like paper/parchment */
+    --background: 0.975 0.008 95;
+    /* Foreground: deep forest charcoal */
+    --foreground: 0.18 0.025 145;
+
+    /* Card: clean warm white */
+    --card: 0.99 0.004 95;
+    --card-foreground: 0.18 0.025 145;
+
+    /* Popover */
+    --popover: 0.99 0.004 95;
+    --popover-foreground: 0.18 0.025 145;
+
+    /* Primary: rich forest green */
+    --primary: 0.42 0.12 148;
+    --primary-foreground: 0.99 0.004 95;
+
+    /* Secondary: sage green tint */
+    --secondary: 0.92 0.03 145;
+    --secondary-foreground: 0.28 0.06 148;
+
+    /* Muted: warm grey-green */
+    --muted: 0.94 0.018 120;
+    --muted-foreground: 0.48 0.04 145;
+
+    /* Accent: golden harvest yellow */
+    --accent: 0.88 0.12 88;
+    --accent-foreground: 0.22 0.06 88;
+
+    /* Destructive: warm red-orange */
+    --destructive: 0.55 0.22 25;
+    --destructive-foreground: 0.99 0 0;
+
+    /* Border: soft sage */
+    --border: 0.88 0.03 145;
+    --input: 0.88 0.03 145;
+    --ring: 0.42 0.12 148;
+
+    /* Charts: harvest palette */
+    --chart-1: 0.42 0.12 148;
+    --chart-2: 0.65 0.14 88;
+    --chart-3: 0.55 0.18 48;
+    --chart-4: 0.58 0.1 200;
+    --chart-5: 0.7 0.1 160;
+
+    /* Sidebar */
+    --sidebar: 0.27 0.055 148;
+    --sidebar-foreground: 0.94 0.018 120;
+    --sidebar-primary: 0.78 0.13 88;
+    --sidebar-primary-foreground: 0.22 0.06 88;
+    --sidebar-accent: 0.35 0.07 148;
+    --sidebar-accent-foreground: 0.94 0.018 120;
+    --sidebar-border: 0.35 0.06 148;
+    --sidebar-ring: 0.65 0.1 148;
+  }
+
+  .dark {
+    --background: 0.13 0.03 148;
+    --foreground: 0.94 0.018 120;
+    --card: 0.18 0.04 148;
+    --card-foreground: 0.94 0.018 120;
+    --popover: 0.22 0.045 148;
+    --popover-foreground: 0.94 0.018 120;
+    --primary: 0.7 0.15 148;
+    --primary-foreground: 0.13 0.03 148;
+    --secondary: 0.25 0.05 148;
+    --secondary-foreground: 0.88 0.03 145;
+    --muted: 0.22 0.04 148;
+    --muted-foreground: 0.62 0.06 145;
+    --accent: 0.75 0.13 88;
+    --accent-foreground: 0.18 0.06 88;
+    --destructive: 0.65 0.22 25;
+    --destructive-foreground: 0.99 0 0;
+    --border: 0.28 0.05 148;
+    --input: 0.28 0.05 148;
+    --ring: 0.7 0.15 148;
+    --chart-1: 0.7 0.15 148;
+    --chart-2: 0.75 0.13 88;
+    --chart-3: 0.65 0.18 48;
+    --chart-4: 0.62 0.12 200;
+    --chart-5: 0.72 0.1 160;
+    --sidebar: 0.15 0.035 148;
+    --sidebar-foreground: 0.88 0.018 120;
+    --sidebar-primary: 0.7 0.15 148;
+    --sidebar-primary-foreground: 0.13 0.03 148;
+    --sidebar-accent: 0.22 0.045 148;
+    --sidebar-accent-foreground: 0.88 0.018 120;
+    --sidebar-border: 0.25 0.04 148;
+    --sidebar-ring: 0.7 0.15 148;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: "Cabinet Grotesk", system-ui, sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: "Bricolage Grotesque", system-ui, sans-serif;
+    font-weight: 700;
+  }
+}
+
+/* ─── Leaflet Map Overrides ─────────────────────────────────────── */
+.leaflet-container {
+  border-radius: var(--radius);
+  z-index: 0;
+}
+
+/* ─── Custom AgriTrace Styles ───────────────────────────────────── */
+.agritrace-grain {
+  position: relative;
+}
+.agritrace-grain::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none;
+  border-radius: inherit;
+  z-index: 0;
+}
+
+.hero-gradient {
+  background: linear-gradient(
+    135deg,
+    oklch(0.42 0.12 148) 0%,
+    oklch(0.35 0.1 165) 50%,
+    oklch(0.28 0.08 145) 100%
+  );
+}
+
+.qr-download-btn:hover {
+  transform: translateY(-1px);
+}
