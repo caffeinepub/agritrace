@@ -40,12 +40,12 @@ import {
   Users,
 } from "lucide-react";
 import { motion } from "motion/react";
-import { QRCodeSVG } from "qrcode.react";
 import { Suspense, lazy, useState } from "react";
 import { toast } from "sonner";
 import type { FarmRecord } from "../backend.d";
 import AppFooter from "../components/AppFooter";
 import AppHeader from "../components/AppHeader";
+import { QRCodeSVG } from "../components/QRCode";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   useAssignSelfAsAdmin,
@@ -409,7 +409,9 @@ function FarmRecordsTab() {
                           variant="secondary"
                           className="font-semibold text-xs"
                         >
-                          {farm.grade}
+                          {farm.grade.includes(" — ")
+                            ? farm.grade.split(" — ")[0]
+                            : farm.grade}
                         </Badge>
                       </TableCell>
                       <TableCell className="hidden sm:table-cell text-muted-foreground text-sm">

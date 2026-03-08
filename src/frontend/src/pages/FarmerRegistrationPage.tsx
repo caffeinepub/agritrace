@@ -17,42 +17,57 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Building2,
   CheckCircle2,
+  Coffee,
   Download,
+  Gauge,
   Leaf,
   Loader2,
   MapIcon,
   MapPin,
+  Mountain,
+  Phone,
   QrCode,
   RotateCcw,
   Sprout,
   User,
-  Wheat,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { QRCodeSVG } from "qrcode.react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import type { FarmRecord } from "../backend.d";
 import AppFooter from "../components/AppFooter";
 import AppHeader from "../components/AppHeader";
+import { QRCodeSVG } from "../components/QRCode";
 import { useAddFarmRecord } from "../hooks/useQueries";
 
 interface FormState {
   farmerName: string;
+  corporateName: string;
+  phoneNumber: string;
   commodity: string;
   grade: string;
+  scoring: string;
   adminArea: string;
+  mount: string;
   location: string; // format: "lat, lng"
 }
 
 const INITIAL_FORM: FormState = {
   farmerName: "",
+  corporateName: "",
+  phoneNumber: "",
   commodity: "",
   grade: "",
+  scoring: "",
   adminArea: "",
+  mount: "",
   location: "",
 };
+
+const COFFEE_SPECIES = ["Arabica", "Robusta", "Liberica", "Excelsa"];
+const COFFEE_GRADES = ["Specialty", "Premium", "Commercial", "Standard"];
 
 function parseLocation(
   location: string,
@@ -65,22 +80,10 @@ function parseLocation(
   return { latitude: lat, longitude: lng };
 }
 
-const COMMODITY_SUGGESTIONS = [
-  "Rice",
-  "Corn",
-  "Coffee",
-  "Sugarcane",
-  "Coconut",
-  "Banana",
-  "Cassava",
-  "Mango",
-];
-
 export default function FarmerRegistrationPage() {
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
   const [geoLoading, setGeoLoading] = useState(false);
   const [submittedFarmId, setSubmittedFarmId] = useState<string | null>(null);
-  const qrRef = useRef<SVGSVGElement>(null);
 
   const addFarmRecord = useAddFarmRecord();
 
@@ -113,8 +116,7 @@ export default function FarmerRegistrationPage() {
     e.preventDefault();
 
     if (!form.farmerName.trim()) return toast.error("Farmer name is required.");
-    if (!form.commodity.trim())
-      return toast.error("Commodity type is required.");
+    if (!form.commodity) return toast.error("Coffee species is required.");
     if (!form.grade) return toast.error("Grade is required.");
     if (!form.adminArea.trim())
       return toast.error("Administrative area is required.");
@@ -126,11 +128,24 @@ export default function FarmerRegistrationPage() {
     }
 
     const farmId = crypto.randomUUID();
+
+    // Encode scoring into grade field: "Specialty — 87" or just "Specialty"
+    const gradeValue = form.scoring.trim()
+      ? `${form.grade} — ${form.scoring.trim()}`
+      : form.grade;
+
+    // Encode mount into adminArea field: "North Aceh | Mount Gayo" or just "North Aceh"
+    const adminAreaValue = form.mount.trim()
+      ? `${form.adminArea} | ${form.mount.trim()}`
+      : form.adminArea;
+
     const record: FarmRecord = {
       farmerName: form.farmerName,
+      corporateName: form.corporateName,
+      phoneNumber: form.phoneNumber,
       commodity: form.commodity,
-      grade: form.grade,
-      adminArea: form.adminArea,
+      grade: gradeValue,
+      adminArea: adminAreaValue,
       latitude: coords.latitude,
       longitude: coords.longitude,
       createdAt: BigInt(Date.now()),
@@ -146,18 +161,22 @@ export default function FarmerRegistrationPage() {
     }
   };
 
-  const handleDownloadQR = () => {
-    if (!qrRef.current || !submittedFarmId) return;
-    const svg = qrRef.current;
-    const svgData = new XMLSerializer().serializeToString(svg);
-    const blob = new Blob([svgData], { type: "image/svg+xml" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `agritrace-${submittedFarmId.slice(0, 8)}.svg`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("QR code downloaded!");
+  const handleDownloadQR = async () => {
+    if (!submittedFarmId) return;
+    try {
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrValue)}&ecc=H`;
+      const response = await fetch(qrUrl);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `agritrace-${submittedFarmId.slice(0, 8)}.png`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("QR code downloaded!");
+    } catch {
+      toast.error("Failed to download QR code. Please try again.");
+    }
   };
 
   const handleReset = () => {
@@ -245,7 +264,7 @@ export default function FarmerRegistrationPage() {
                       <Input
                         id="farmerName"
                         data-ocid="registration.farmerName.input"
-                        placeholder="e.g. Juan dela Cruz"
+                        placeholder="e.g. Budi Santoso"
                         value={form.farmerName}
                         onChange={(e) =>
                           setForm((p) => ({ ...p, farmerName: e.target.value }))
@@ -255,67 +274,140 @@ export default function FarmerRegistrationPage() {
                       />
                     </div>
 
-                    {/* Commodity */}
+                    {/* Corporate Name */}
                     <div className="space-y-1.5">
                       <Label
-                        htmlFor="commodity"
+                        htmlFor="corporateName"
                         className="flex items-center gap-1.5 font-sans font-medium"
                       >
-                        <Wheat className="w-3.5 h-3.5 text-muted-foreground" />
-                        Commodity Type
+                        <Building2 className="w-3.5 h-3.5 text-muted-foreground" />
+                        Corporate Name
                       </Label>
                       <Input
-                        id="commodity"
-                        data-ocid="registration.commodity.input"
-                        placeholder="e.g. Rice, Corn, Coffee"
-                        value={form.commodity}
+                        id="corporateName"
+                        data-ocid="registration.corporateName.input"
+                        placeholder="e.g. PT Kopi Nusantara"
+                        value={form.corporateName}
                         onChange={(e) =>
-                          setForm((p) => ({ ...p, commodity: e.target.value }))
+                          setForm((p) => ({
+                            ...p,
+                            corporateName: e.target.value,
+                          }))
                         }
-                        required
-                        list="commodity-suggestions"
                         className="font-sans"
                       />
-                      <datalist id="commodity-suggestions">
-                        {COMMODITY_SUGGESTIONS.map((c) => (
-                          <option key={c} value={c} />
-                        ))}
-                      </datalist>
                     </div>
 
-                    {/* Grade */}
+                    {/* Phone Number */}
+                    <div className="space-y-1.5">
+                      <Label
+                        htmlFor="phoneNumber"
+                        className="flex items-center gap-1.5 font-sans font-medium"
+                      >
+                        <Phone className="w-3.5 h-3.5 text-muted-foreground" />
+                        Phone Number
+                      </Label>
+                      <Input
+                        id="phoneNumber"
+                        data-ocid="registration.phoneNumber.input"
+                        placeholder="e.g. +62 812 3456 7890"
+                        value={form.phoneNumber}
+                        onChange={(e) =>
+                          setForm((p) => ({
+                            ...p,
+                            phoneNumber: e.target.value,
+                          }))
+                        }
+                        type="tel"
+                        className="font-sans"
+                      />
+                    </div>
+
+                    {/* Coffee Species */}
                     <div className="space-y-1.5">
                       <Label className="flex items-center gap-1.5 font-sans font-medium">
-                        Grade
+                        <Coffee className="w-3.5 h-3.5 text-muted-foreground" />
+                        Coffee Species
                       </Label>
                       <Select
-                        value={form.grade}
+                        value={form.commodity}
                         onValueChange={(val) =>
-                          setForm((p) => ({ ...p, grade: val }))
+                          setForm((p) => ({ ...p, commodity: val, grade: "" }))
                         }
                       >
                         <SelectTrigger
-                          data-ocid="registration.grade.select"
+                          data-ocid="registration.commodity.select"
                           className="font-sans"
                         >
-                          <SelectValue placeholder="Select a grade" />
+                          <SelectValue placeholder="Pilih jenis kopi" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="A">
-                            Grade A — Premium Quality
-                          </SelectItem>
-                          <SelectItem value="B">
-                            Grade B — Standard Quality
-                          </SelectItem>
-                          <SelectItem value="C">
-                            Grade C — Economy Quality
-                          </SelectItem>
-                          <SelectItem value="D">
-                            Grade D — Below Standard
-                          </SelectItem>
+                          {COFFEE_SPECIES.map((species) => (
+                            <SelectItem key={species} value={species}>
+                              {species}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
+
+                    {/* Grade — hanya tampil setelah species dipilih */}
+                    {form.commodity && (
+                      <div className="space-y-3">
+                        <Label className="flex items-center gap-1.5 font-sans font-medium">
+                          <Gauge className="w-3.5 h-3.5 text-muted-foreground" />
+                          Grade
+                        </Label>
+                        <div className="grid grid-cols-2 gap-3">
+                          {COFFEE_GRADES.map((g) => (
+                            <button
+                              key={g}
+                              type="button"
+                              data-ocid={`registration.grade.${g.toLowerCase()}.button`}
+                              onClick={() =>
+                                setForm((p) => ({
+                                  ...p,
+                                  grade: g,
+                                  scoring: "",
+                                }))
+                              }
+                              className={`rounded-lg border-2 px-4 py-3 text-sm font-semibold font-sans transition-all ${
+                                form.grade === g
+                                  ? "border-primary bg-primary/10 text-primary"
+                                  : "border-border bg-background text-foreground hover:border-primary/50"
+                              }`}
+                            >
+                              {g}
+                            </button>
+                          ))}
+                        </div>
+                        {/* Scoring — tampil setelah grade dipilih */}
+                        {form.grade && (
+                          <div className="space-y-1.5">
+                            <Label
+                              htmlFor="scoring"
+                              className="flex items-center gap-1.5 font-sans font-medium text-sm"
+                            >
+                              <Gauge className="w-3.5 h-3.5 text-muted-foreground" />
+                              Scoring
+                            </Label>
+                            <Input
+                              id="scoring"
+                              data-ocid="registration.scoring.input"
+                              placeholder="e.g. 87.5"
+                              value={form.scoring}
+                              onChange={(e) =>
+                                setForm((p) => ({
+                                  ...p,
+                                  scoring: e.target.value,
+                                }))
+                              }
+                              className="font-sans"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {/* Administrative Area */}
                     <div className="space-y-1.5">
@@ -335,6 +427,27 @@ export default function FarmerRegistrationPage() {
                           setForm((p) => ({ ...p, adminArea: e.target.value }))
                         }
                         required
+                        className="font-sans"
+                      />
+                    </div>
+
+                    {/* Mount */}
+                    <div className="space-y-1.5">
+                      <Label
+                        htmlFor="mount"
+                        className="flex items-center gap-1.5 font-sans font-medium"
+                      >
+                        <Mountain className="w-3.5 h-3.5 text-muted-foreground" />
+                        Mount
+                      </Label>
+                      <Input
+                        id="mount"
+                        data-ocid="registration.mount.input"
+                        placeholder="e.g. Mount Gayo, Mount Kerinci"
+                        value={form.mount}
+                        onChange={(e) =>
+                          setForm((p) => ({ ...p, mount: e.target.value }))
+                        }
                         className="font-sans"
                       />
                     </div>
@@ -461,8 +574,28 @@ export default function FarmerRegistrationPage() {
                         {form.farmerName}
                       </p>
                     </div>
+                    {form.corporateName && (
+                      <div>
+                        <p className="text-muted-foreground text-xs">
+                          Corporate
+                        </p>
+                        <p className="font-semibold text-foreground">
+                          {form.corporateName}
+                        </p>
+                      </div>
+                    )}
+                    {form.phoneNumber && (
+                      <div>
+                        <p className="text-muted-foreground text-xs">Phone</p>
+                        <p className="font-semibold text-foreground">
+                          {form.phoneNumber}
+                        </p>
+                      </div>
+                    )}
                     <div>
-                      <p className="text-muted-foreground text-xs">Commodity</p>
+                      <p className="text-muted-foreground text-xs">
+                        Coffee Species
+                      </p>
                       <p className="font-semibold text-foreground">
                         {form.commodity}
                       </p>
@@ -473,15 +606,31 @@ export default function FarmerRegistrationPage() {
                         variant="secondary"
                         className="font-semibold text-xs"
                       >
-                        Grade {form.grade}
+                        {form.grade}
                       </Badge>
                     </div>
+                    {form.scoring && (
+                      <div>
+                        <p className="text-muted-foreground text-xs">Scoring</p>
+                        <p className="font-semibold text-foreground">
+                          {form.scoring}
+                        </p>
+                      </div>
+                    )}
                     <div>
                       <p className="text-muted-foreground text-xs">Region</p>
                       <p className="font-semibold text-foreground">
                         {form.adminArea}
                       </p>
                     </div>
+                    {form.mount && (
+                      <div>
+                        <p className="text-muted-foreground text-xs">Mount</p>
+                        <p className="font-semibold text-foreground">
+                          {form.mount}
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   {/* QR Code */}
@@ -492,7 +641,6 @@ export default function FarmerRegistrationPage() {
                     className="p-5 bg-white rounded-2xl shadow-md border border-border"
                   >
                     <QRCodeSVG
-                      ref={qrRef}
                       value={qrValue}
                       size={200}
                       level="H"

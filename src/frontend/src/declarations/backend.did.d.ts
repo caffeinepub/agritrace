@@ -13,9 +13,11 @@ import type { Principal } from '@icp-sdk/core/principal';
 export interface FarmRecord {
   'latitude' : number,
   'createdAt' : bigint,
+  'corporateName' : string,
   'adminArea' : string,
   'longitude' : number,
   'grade' : string,
+  'phoneNumber' : string,
   'commodity' : string,
   'farmerName' : string,
 }
@@ -29,6 +31,11 @@ export interface ScanStats {
   'scanEvents' : Array<ScanEvent>,
   'totalScans' : bigint,
 }
+export interface UserProfile {
+  'name' : string,
+  'email' : string,
+  'organization' : string,
+}
 export type UserRole = { 'admin' : null } |
   { 'user' : null } |
   { 'guest' : null };
@@ -38,11 +45,14 @@ export interface _SERVICE {
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
   'getAllFarmRecords' : ActorMethod<[], Array<FarmRecord>>,
   'getAllScanStats' : ActorMethod<[], Array<ScanEvent>>,
+  'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
   'getFarmRecord' : ActorMethod<[string], FarmRecord>,
   'getFarmScanStats' : ActorMethod<[string], ScanStats>,
+  'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
   'logScan' : ActorMethod<[string, string], undefined>,
+  'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

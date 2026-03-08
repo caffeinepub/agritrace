@@ -10,9 +10,11 @@ export type Option<T> = Some<T> | None;
 export interface FarmRecord {
     latitude: number;
     createdAt: bigint;
+    corporateName: string;
     adminArea: string;
     longitude: number;
     grade: string;
+    phoneNumber: string;
     commodity: string;
     farmerName: string;
 }
@@ -26,6 +28,11 @@ export interface ScanStats {
     scanEvents: Array<ScanEvent>;
     totalScans: bigint;
 }
+export interface UserProfile {
+    name: string;
+    email: string;
+    organization: string;
+}
 export enum UserRole {
     admin = "admin",
     user = "user",
@@ -36,9 +43,12 @@ export interface backendInterface {
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     getAllFarmRecords(): Promise<Array<FarmRecord>>;
     getAllScanStats(): Promise<Array<ScanEvent>>;
+    getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
     getFarmRecord(farmId: string): Promise<FarmRecord>;
     getFarmScanStats(farmId: string): Promise<ScanStats>;
+    getUserProfile(user: Principal): Promise<UserProfile | null>;
     isCallerAdmin(): Promise<boolean>;
     logScan(farmId: string, userAgent: string): Promise<void>;
+    saveCallerUserProfile(profile: UserProfile): Promise<void>;
 }

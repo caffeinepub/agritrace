@@ -11,9 +11,11 @@ import { IDL } from '@icp-sdk/core/candid';
 export const FarmRecord = IDL.Record({
   'latitude' : IDL.Float64,
   'createdAt' : IDL.Int,
+  'corporateName' : IDL.Text,
   'adminArea' : IDL.Text,
   'longitude' : IDL.Float64,
   'grade' : IDL.Text,
+  'phoneNumber' : IDL.Text,
   'commodity' : IDL.Text,
   'farmerName' : IDL.Text,
 });
@@ -28,6 +30,11 @@ export const ScanEvent = IDL.Record({
   'userAgent' : IDL.Text,
   'farmId' : IDL.Text,
 });
+export const UserProfile = IDL.Record({
+  'name' : IDL.Text,
+  'email' : IDL.Text,
+  'organization' : IDL.Text,
+});
 export const ScanStats = IDL.Record({
   'scanEvents' : IDL.Vec(ScanEvent),
   'totalScans' : IDL.Nat,
@@ -39,11 +46,18 @@ export const idlService = IDL.Service({
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
   'getAllFarmRecords' : IDL.Func([], [IDL.Vec(FarmRecord)], ['query']),
   'getAllScanStats' : IDL.Func([], [IDL.Vec(ScanEvent)], ['query']),
+  'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
   'getFarmRecord' : IDL.Func([IDL.Text], [FarmRecord], ['query']),
   'getFarmScanStats' : IDL.Func([IDL.Text], [ScanStats], ['query']),
+  'getUserProfile' : IDL.Func(
+      [IDL.Principal],
+      [IDL.Opt(UserProfile)],
+      ['query'],
+    ),
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
   'logScan' : IDL.Func([IDL.Text, IDL.Text], [], []),
+  'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
 });
 
 export const idlInitArgs = [];
@@ -52,9 +66,11 @@ export const idlFactory = ({ IDL }) => {
   const FarmRecord = IDL.Record({
     'latitude' : IDL.Float64,
     'createdAt' : IDL.Int,
+    'corporateName' : IDL.Text,
     'adminArea' : IDL.Text,
     'longitude' : IDL.Float64,
     'grade' : IDL.Text,
+    'phoneNumber' : IDL.Text,
     'commodity' : IDL.Text,
     'farmerName' : IDL.Text,
   });
@@ -69,6 +85,11 @@ export const idlFactory = ({ IDL }) => {
     'userAgent' : IDL.Text,
     'farmId' : IDL.Text,
   });
+  const UserProfile = IDL.Record({
+    'name' : IDL.Text,
+    'email' : IDL.Text,
+    'organization' : IDL.Text,
+  });
   const ScanStats = IDL.Record({
     'scanEvents' : IDL.Vec(ScanEvent),
     'totalScans' : IDL.Nat,
@@ -80,11 +101,18 @@ export const idlFactory = ({ IDL }) => {
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
     'getAllFarmRecords' : IDL.Func([], [IDL.Vec(FarmRecord)], ['query']),
     'getAllScanStats' : IDL.Func([], [IDL.Vec(ScanEvent)], ['query']),
+    'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
     'getFarmRecord' : IDL.Func([IDL.Text], [FarmRecord], ['query']),
     'getFarmScanStats' : IDL.Func([IDL.Text], [ScanStats], ['query']),
+    'getUserProfile' : IDL.Func(
+        [IDL.Principal],
+        [IDL.Opt(UserProfile)],
+        ['query'],
+      ),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
     'logScan' : IDL.Func([IDL.Text, IDL.Text], [], []),
+    'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
   });
 };
 

@@ -5,21 +5,25 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Link, useParams } from "@tanstack/react-router";
 import {
   ArrowLeft,
+  Building2,
   Calendar,
+  Coffee,
   ExternalLink,
+  Gauge,
   Leaf,
   MapIcon,
   MapPin,
+  Mountain,
+  Phone,
   ShieldCheck,
   Star,
   User,
-  Wheat,
 } from "lucide-react";
 import { motion } from "motion/react";
-import { QRCodeSVG } from "qrcode.react";
 import { useEffect } from "react";
 import { toast } from "sonner";
 import AppFooter from "../components/AppFooter";
+import { QRCodeSVG } from "../components/QRCode";
 import { useGetFarmRecord } from "../hooks/useQueries";
 import { useLogScan } from "../hooks/useQueries";
 
@@ -35,11 +39,27 @@ function formatDate(bigintMs: bigint): string {
 }
 
 const GRADE_COLORS: Record<string, string> = {
-  A: "bg-emerald-100 text-emerald-800 border-emerald-200",
-  B: "bg-blue-100 text-blue-800 border-blue-200",
-  C: "bg-amber-100 text-amber-800 border-amber-200",
-  D: "bg-red-100 text-red-800 border-red-200",
+  Specialty: "bg-purple-100 text-purple-800 border-purple-200",
+  Premium: "bg-amber-100 text-amber-800 border-amber-200",
+  Commercial: "bg-blue-100 text-blue-800 border-blue-200",
+  Standard: "bg-slate-100 text-slate-700 border-slate-200",
 };
+
+function parseGrade(raw: string): { gradeName: string; scoring: string } {
+  const idx = raw.indexOf(" — ");
+  if (idx !== -1) {
+    return { gradeName: raw.slice(0, idx), scoring: raw.slice(idx + 3) };
+  }
+  return { gradeName: raw, scoring: "" };
+}
+
+function parseAdminArea(raw: string): { adminArea: string; mount: string } {
+  const idx = raw.indexOf(" | ");
+  if (idx !== -1) {
+    return { adminArea: raw.slice(0, idx), mount: raw.slice(idx + 3) };
+  }
+  return { adminArea: raw, mount: "" };
+}
 
 export default function TraceabilityPage() {
   const { farmId } = useParams({ from: "/trace/$farmId" });
@@ -58,6 +78,13 @@ export default function TraceabilityPage() {
   const mapsUrl = farm
     ? `https://www.google.com/maps?q=${farm.latitude},${farm.longitude}`
     : "#";
+
+  const { gradeName, scoring } = farm
+    ? parseGrade(farm.grade)
+    : { gradeName: "", scoring: "" };
+  const { adminArea, mount } = farm
+    ? parseAdminArea(farm.adminArea)
+    : { adminArea: "", mount: "" };
 
   if (isLoading) {
     return (
@@ -143,13 +170,13 @@ export default function TraceabilityPage() {
                     {farm.farmerName}
                   </CardTitle>
                   <p className="text-muted-foreground font-sans text-sm mt-0.5">
-                    {farm.adminArea}
+                    {adminArea}
                   </p>
                 </div>
                 <Badge
-                  className={`font-semibold text-sm border ${GRADE_COLORS[farm.grade] ?? "bg-muted text-foreground"}`}
+                  className={`font-semibold text-sm border ${GRADE_COLORS[gradeName] ?? "bg-muted text-foreground"}`}
                 >
-                  Grade {farm.grade}
+                  {gradeName}
                 </Badge>
               </div>
             </CardHeader>
@@ -161,24 +188,56 @@ export default function TraceabilityPage() {
                   value={farm.farmerName}
                   ocid="trace.farmer.card"
                 />
+                {farm.corporateName && (
+                  <InfoRow
+                    icon={<Building2 className="w-4 h-4" />}
+                    label="Corporate"
+                    value={farm.corporateName}
+                    ocid="trace.corporate.card"
+                  />
+                )}
+                {farm.phoneNumber && (
+                  <InfoRow
+                    icon={<Phone className="w-4 h-4" />}
+                    label="Phone"
+                    value={farm.phoneNumber}
+                    ocid="trace.phone.card"
+                  />
+                )}
                 <InfoRow
-                  icon={<Wheat className="w-4 h-4" />}
-                  label="Commodity"
+                  icon={<Coffee className="w-4 h-4" />}
+                  label="Coffee Species"
                   value={farm.commodity}
                   ocid="trace.commodity.card"
                 />
                 <InfoRow
                   icon={<Star className="w-4 h-4" />}
                   label="Grade"
-                  value={`Grade ${farm.grade}`}
+                  value={gradeName}
                   ocid="trace.grade.card"
                 />
+                {scoring && (
+                  <InfoRow
+                    icon={<Gauge className="w-4 h-4" />}
+                    label="Scoring"
+                    value={scoring}
+                    ocid="trace.scoring.card"
+                  />
+                )}
                 <InfoRow
                   icon={<MapIcon className="w-4 h-4" />}
                   label="Region"
-                  value={farm.adminArea}
+                  value={adminArea}
                   ocid="trace.region.card"
                 />
+                {mount && (
+                  <InfoRow
+                    icon={<Mountain className="w-4 h-4" />}
+                    label="Mount"
+                    value={mount}
+                    ocid="trace.mount.card"
+                  />
+                )}
               </div>
 
               <div className="border-t border-border pt-4 space-y-2">

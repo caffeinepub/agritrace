@@ -7,14 +7,19 @@ import Map "mo:core/Map";
 import Runtime "mo:core/Runtime";
 import Float "mo:core/Float";
 import List "mo:core/List";
+import Principal "mo:core/Principal";
+
 
 import AccessControl "authorization/access-control";
 import MixinAuthorization "authorization/MixinAuthorization";
+
 
 actor {
   // Types
   type FarmRecord = {
     farmerName : Text;
+    corporateName : Text;
+    phoneNumber : Text;
     commodity : Text;
     grade : Text;
     adminArea : Text;
@@ -54,13 +59,42 @@ actor {
     scanEvents : [ScanEvent];
   };
 
+  public type UserProfile = {
+    name : Text;
+    email : Text;
+    organization : Text;
+  };
+
   // Data Structures
   let farmRecords = Map.empty<Text, FarmRecord>();
   let scanStats = Map.empty<Text, List.List<ScanEvent>>();
+  let userProfiles = Map.empty<Principal, UserProfile>();
 
   // Authorization
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
+
+  // User Profile Management
+  public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can access profiles");
+    };
+    userProfiles.get(caller);
+  };
+
+  public query ({ caller }) func getUserProfile(user : Principal) : async ?UserProfile {
+    if (caller != user and not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Can only view your own profile");
+    };
+    userProfiles.get(user);
+  };
+
+  public shared ({ caller }) func saveCallerUserProfile(profile : UserProfile) : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can save profiles");
+    };
+    userProfiles.add(caller, profile);
+  };
 
   // Farm Records Management
   public shared ({ caller }) func addFarmRecord(farmId : Text, record : FarmRecord) : async () {
@@ -70,7 +104,8 @@ actor {
     farmRecords.add(farmId, record);
   };
 
-  public query ({ caller }) func getFarmRecord(farmId : Text) : async FarmRecord {
+  // Public endpoint - accessible to anyone including guests for QR code lookup
+  public query func getFarmRecord(farmId : Text) : async FarmRecord {
     switch (farmRecords.get(farmId)) {
       case (null) { Runtime.trap("Farm record not found") };
       case (?record) { record };
@@ -85,7 +120,8 @@ actor {
   };
 
   // QR Scan Tracking
-  public shared ({ caller }) func logScan(farmId : Text, userAgent : Text) : async () {
+  // Public endpoint - accessible to anyone including guests for QR code scanning
+  public shared func logScan(farmId : Text, userAgent : Text) : async () {
     let deviceType = getDeviceType(userAgent);
     let scanEvent : ScanEvent = {
       farmId;
@@ -102,7 +138,8 @@ actor {
     scanStats.add(farmId, existingEvents);
   };
 
-  public query ({ caller }) func getFarmScanStats(farmId : Text) : async ScanStats {
+  // Public endpoint - accessible to anyone including guests for transparency
+  public query func getFarmScanStats(farmId : Text) : async ScanStats {
     switch (scanStats.get(farmId)) {
       case (null) {
         {

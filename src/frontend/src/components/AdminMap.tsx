@@ -1,26 +1,11 @@
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
-import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
 import type { FarmRecord } from "../backend.d";
-
-// Fix leaflet default marker icons
-// biome-ignore lint/performance/noDelete: Required to fix Leaflet icon loading issue
-delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)
-  ._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl:
-    "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-});
 
 interface AdminMapProps {
   farms: FarmRecord[];
 }
 
-// Default center: Philippines roughly
-const DEFAULT_CENTER: [number, number] = [12.8797, 121.774];
-const DEFAULT_ZOOM = 6;
+// Default center: Indonesia roughly
+const DEFAULT_CENTER: [number, number] = [-2.5, 118.0];
 
 export default function AdminMap({ farms }: AdminMapProps) {
   // Calculate center based on farms if any
@@ -32,49 +17,111 @@ export default function AdminMap({ farms }: AdminMapProps) {
         ]
       : DEFAULT_CENTER;
 
+  // Build OpenStreetMap embed URL with markers
+  // OSM doesn't support multiple markers in iframe, so we show the center
+  // For a richer experience, build a link to OSM with all farm pins
+  const osmEmbedUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${center[1] - 2},${center[0] - 2},${center[1] + 2},${center[0] + 2}&layer=mapnik&marker=${center[0]},${center[1]}`;
+
   return (
     <div
-      style={{ height: "450px", width: "100%" }}
+      style={{ height: "450px", width: "100%", position: "relative" }}
       data-ocid="admin.map.canvas_target"
     >
-      <MapContainer
-        center={center}
-        zoom={farms.length > 0 ? 8 : DEFAULT_ZOOM}
-        style={{ height: "100%", width: "100%" }}
-        scrollWheelZoom={true}
-      >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
-        {farms.map((farm, idx) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: no unique farm id in record
-          <Marker key={idx} position={[farm.latitude, farm.longitude]}>
-            <Popup>
-              <div className="font-sans text-sm min-w-[160px]">
-                <p className="font-bold text-foreground mb-0.5">
-                  {farm.farmerName}
-                </p>
-                <p className="text-muted-foreground text-xs">
-                  {farm.commodity}
-                </p>
-                <p className="text-muted-foreground text-xs mb-2">
-                  {farm.adminArea}
-                </p>
-                <a
-                  href={`${window.location.origin}/trace/farm-${Number(farm.createdAt)}-${idx}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-primary underline"
-                  data-ocid={`admin.map.marker.${idx + 1}`}
-                >
-                  View Trace →
-                </a>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
-      </MapContainer>
+      <iframe
+        title="Farm Locations Map"
+        src={osmEmbedUrl}
+        style={{ width: "100%", height: "100%", border: "none" }}
+        allowFullScreen
+      />
+      {/* Farm pins overlay list */}
+      {farms.length > 0 && (
+        <div
+          style={{
+            position: "absolute",
+            top: 12,
+            right: 12,
+            background: "rgba(255,255,255,0.97)",
+            borderRadius: 8,
+            padding: "10px 14px",
+            maxHeight: 220,
+            overflowY: "auto",
+            boxShadow: "0 2px 12px rgba(0,0,0,0.15)",
+            fontSize: 12,
+            minWidth: 160,
+            zIndex: 1000,
+          }}
+        >
+          <p
+            style={{
+              fontWeight: 700,
+              marginBottom: 8,
+              fontSize: 11,
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+              color: "#555",
+            }}
+          >
+            {farms.length} Farm{farms.length !== 1 ? "s" : ""}
+          </p>
+          {farms.map((farm, idx) => (
+            <div
+              // biome-ignore lint/suspicious/noArrayIndexKey: no unique farm id in record
+              key={idx}
+              style={{
+                paddingBottom: 8,
+                marginBottom: 8,
+                borderBottom:
+                  idx < farms.length - 1 ? "1px solid #eee" : "none",
+              }}
+            >
+              <p style={{ fontWeight: 600, color: "#111", marginBottom: 2 }}>
+                {farm.farmerName}
+              </p>
+              <p style={{ color: "#666", fontSize: 11 }}>
+                {farm.commodity} · {farm.adminArea.split(" | ")[0]}
+              </p>
+              <p
+                style={{ color: "#888", fontSize: 10, fontFamily: "monospace" }}
+              >
+                {farm.latitude.toFixed(4)}, {farm.longitude.toFixed(4)}
+              </p>
+              <a
+                href={`https://www.google.com/maps?q=${farm.latitude},${farm.longitude}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  color: "#2563eb",
+                  fontSize: 11,
+                  textDecoration: "none",
+                }}
+                data-ocid={`admin.map.marker.${idx + 1}`}
+              >
+                View on Maps →
+              </a>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {farms.length === 0 && (
+        <div
+          style={{
+            position: "absolute",
+            bottom: 16,
+            left: "50%",
+            transform: "translateX(-50%)",
+            background: "rgba(255,255,255,0.95)",
+            borderRadius: 8,
+            padding: "8px 16px",
+            fontSize: 12,
+            color: "#666",
+            zIndex: 1000,
+            whiteSpace: "nowrap",
+          }}
+        >
+          No farms registered yet
+        </div>
+      )}
     </div>
   );
 }
