@@ -51,7 +51,7 @@ interface FormState {
   scoring: string;
   adminArea: string;
   mount: string;
-  location: string; // format: "lat, lng"
+  location: string;
 }
 
 const INITIAL_FORM: FormState = {
@@ -69,7 +69,45 @@ const INITIAL_FORM: FormState = {
 const COFFEE_SPECIES = ["Arabica", "Robusta", "Liberica", "Excelsa"];
 const COFFEE_GRADES = ["Specialty", "Premium", "Commercial", "Standard"];
 
-function parseLocation(
+/**
+ * Parse DMS component like 7°13'00.15"S → signed decimal degrees
+ */
+function parseDMSPart(str: string): number | null {
+  // Match: degrees°minutes'seconds"direction  (direction: N/S/E/W)
+  const match = str
+    .trim()
+    .match(/^(\d+)[°\s](\d+)['\'\s](\d+(?:\.\d+)?)["\"\s]*([NSEWnsew])$/);
+  if (!match) return null;
+  const deg = Number.parseFloat(match[1]);
+  const min = Number.parseFloat(match[2]);
+  const sec = Number.parseFloat(match[3]);
+  const dir = match[4].toUpperCase();
+  const decimal = deg + min / 60 + sec / 3600;
+  return dir === "S" || dir === "W" ? -decimal : decimal;
+}
+
+/**
+ * Try to parse a DMS string like "7°13'00.15\"S 107°37'20.15\"E"
+ */
+function parseDMS(
+  location: string,
+): { latitude: number; longitude: number } | null {
+  // Split on space but keep the direction letter attached
+  // Pattern: split between two coordinate groups
+  const dmsPattern =
+    /^(\d+[°\s]\d+['\'\s]\d+(?:\.\d+)?["\"\s]*[NSns])\s+(\d+[°\s]\d+['\'\s]\d+(?:\.\d+)?["\"\s]*[EWew])$/;
+  const m = location.trim().match(dmsPattern);
+  if (!m) return null;
+  const lat = parseDMSPart(m[1]);
+  const lng = parseDMSPart(m[2]);
+  if (lat === null || lng === null) return null;
+  return { latitude: lat, longitude: lng };
+}
+
+/**
+ * Parse decimal format: "-7.21671, 107.62227" or "7.21671, 107.62227"
+ */
+function parseDecimal(
   location: string,
 ): { latitude: number; longitude: number } | null {
   const parts = location.split(",").map((s) => s.trim());
@@ -78,6 +116,12 @@ function parseLocation(
   const lng = Number.parseFloat(parts[1]);
   if (Number.isNaN(lat) || Number.isNaN(lng)) return null;
   return { latitude: lat, longitude: lng };
+}
+
+function parseLocation(
+  location: string,
+): { latitude: number; longitude: number } | null {
+  return parseDMS(location) ?? parseDecimal(location);
 }
 
 export default function FarmerRegistrationPage() {
@@ -123,18 +167,16 @@ export default function FarmerRegistrationPage() {
     const coords = parseLocation(form.location);
     if (!coords) {
       return toast.error(
-        "Format lokasi tidak valid. Gunakan format: -6.200000, 106.816666",
+        "Format lokasi tidak valid. Gunakan: 7°13'00.15\"S 107°37'20.15\"E atau -7.216710, 107.622270",
       );
     }
 
     const farmId = crypto.randomUUID();
 
-    // Encode scoring into grade field: "Specialty — 87" or just "Specialty"
     const gradeValue = form.scoring.trim()
       ? `${form.grade} — ${form.scoring.trim()}`
       : form.grade;
 
-    // Encode mount into adminArea field: "North Aceh | Mount Gayo" or just "North Aceh"
     const adminAreaValue = form.mount.trim()
       ? `${form.adminArea} | ${form.mount.trim()}`
       : form.adminArea;
@@ -452,7 +494,7 @@ export default function FarmerRegistrationPage() {
                       />
                     </div>
 
-                    {/* Geolocation */}
+                    {/* Farm Location */}
                     <div className="space-y-2">
                       <Label
                         htmlFor="location"
@@ -465,13 +507,22 @@ export default function FarmerRegistrationPage() {
                       <Input
                         id="location"
                         data-ocid="registration.location.input"
-                        placeholder="e.g. -6.200000, 106.816666"
+                        placeholder={`e.g. 7°13'00.15"S 107°37'20.15"E`}
                         value={form.location}
                         onChange={(e) =>
                           setForm((p) => ({ ...p, location: e.target.value }))
                         }
                         className="font-sans text-sm font-mono"
                       />
+
+                      <p className="text-xs text-muted-foreground font-sans">
+                        Format DMS:{" "}
+                        <span className="font-mono">
+                          7°13'00.15"S 107°37'20.15"E
+                        </span>
+                        &nbsp;atau desimal:&nbsp;
+                        <span className="font-mono">-7.216710, 107.622270</span>
+                      </p>
 
                       <Button
                         type="button"
@@ -498,10 +549,6 @@ export default function FarmerRegistrationPage() {
                           </>
                         )}
                       </Button>
-                      <p className="text-xs text-muted-foreground font-sans">
-                        Salin koordinat dari Google Maps (klik kanan &gt;
-                        "What's here?"), atau gunakan tombol GPS di atas.
-                      </p>
                     </div>
 
                     {/* Submit */}
