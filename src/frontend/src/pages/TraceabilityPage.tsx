@@ -16,7 +16,9 @@ import {
   Mountain,
   Phone,
   ShieldCheck,
+  Sprout,
   Star,
+  Trees,
   User,
 } from "lucide-react";
 import { motion } from "motion/react";
@@ -24,8 +26,7 @@ import { useEffect } from "react";
 import { toast } from "sonner";
 import AppFooter from "../components/AppFooter";
 import { QRCodeSVG } from "../components/QRCode";
-import { useGetFarmRecord } from "../hooks/useQueries";
-import { useLogScan } from "../hooks/useQueries";
+import { useGetFarmRecord, useLogScan } from "../hooks/useQueries";
 
 function formatDate(bigintMs: bigint): string {
   const ms = Number(bigintMs);
@@ -46,7 +47,7 @@ const GRADE_COLORS: Record<string, string> = {
 };
 
 function parseGrade(raw: string): { gradeName: string; scoring: string } {
-  const idx = raw.indexOf(" — ");
+  const idx = raw.indexOf(" \u2014 ");
   if (idx !== -1) {
     return { gradeName: raw.slice(0, idx), scoring: raw.slice(idx + 3) };
   }
@@ -61,13 +62,23 @@ function parseAdminArea(raw: string): { adminArea: string; mount: string } {
   return { adminArea: raw, mount: "" };
 }
 
+function parseVarieties(raw: string): Array<{ name: string; pct: string }> {
+  if (!raw) return [];
+  return raw.split("|").map((part) => {
+    const colonIdx = part.lastIndexOf(":");
+    if (colonIdx !== -1) {
+      return { name: part.slice(0, colonIdx), pct: part.slice(colonIdx + 1) };
+    }
+    return { name: part, pct: "" };
+  });
+}
+
 export default function TraceabilityPage() {
   const { farmId } = useParams({ from: "/trace/$farmId" });
   const { data: farm, isLoading, isError } = useGetFarmRecord(farmId);
   const logScan = useLogScan();
   const logScanMutate = logScan.mutate;
 
-  // Log scan on mount
   useEffect(() => {
     if (farmId) {
       logScanMutate({ farmId, userAgent: navigator.userAgent });
@@ -85,6 +96,7 @@ export default function TraceabilityPage() {
   const { adminArea, mount } = farm
     ? parseAdminArea(farm.adminArea)
     : { adminArea: "", mount: "" };
+  const varieties = farm ? parseVarieties(farm.varieties ?? "") : [];
 
   if (isLoading) {
     return (
@@ -174,7 +186,9 @@ export default function TraceabilityPage() {
                   </p>
                 </div>
                 <Badge
-                  className={`font-semibold text-sm border ${GRADE_COLORS[gradeName] ?? "bg-muted text-foreground"}`}
+                  className={`font-semibold text-sm border ${
+                    GRADE_COLORS[gradeName] ?? "bg-muted text-foreground"
+                  }`}
                 >
                   {gradeName}
                 </Badge>
@@ -238,7 +252,59 @@ export default function TraceabilityPage() {
                     ocid="trace.mount.card"
                   />
                 )}
+                {farm.farmSize && (
+                  <InfoRow
+                    icon={<Trees className="w-4 h-4" />}
+                    label="Farm Size"
+                    value={`${farm.farmSize} ha`}
+                    ocid="trace.farmSize.card"
+                  />
+                )}
+                {farm.coffeeTreeCount && (
+                  <InfoRow
+                    icon={<Sprout className="w-4 h-4" />}
+                    label="Coffee Trees"
+                    value={`${farm.coffeeTreeCount} pcs`}
+                    ocid="trace.coffeeTreeCount.card"
+                  />
+                )}
+                {farm.shadeTreePct && (
+                  <InfoRow
+                    icon={<Trees className="w-4 h-4" />}
+                    label="Shade Trees"
+                    value={`${farm.shadeTreePct}%`}
+                    ocid="trace.shadeTreePct.card"
+                  />
+                )}
               </div>
+
+              {/* Varieties */}
+              {varieties.length > 0 && (
+                <div className="border-t border-border pt-4">
+                  <p className="text-xs text-muted-foreground font-sans mb-2 flex items-center gap-1.5">
+                    <Sprout className="w-3.5 h-3.5" /> Variety Composition
+                  </p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {varieties.map((v, i) => (
+                      <div
+                        // biome-ignore lint/suspicious/noArrayIndexKey: stable order
+                        key={i}
+                        className="rounded-md bg-secondary/50 px-3 py-2 text-center"
+                        data-ocid={`trace.variety.card.${i + 1}`}
+                      >
+                        <p className="font-semibold text-sm font-sans">
+                          {v.name}
+                        </p>
+                        {v.pct && (
+                          <p className="text-xs text-muted-foreground font-sans">
+                            {v.pct}%
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="border-t border-border pt-4 space-y-2">
                 <div className="flex items-center gap-2 text-sm font-sans">
@@ -306,7 +372,6 @@ export default function TraceabilityPage() {
           </Card>
         </motion.div>
 
-        {/* Farm ID for reference */}
         <p className="text-xs text-muted-foreground font-sans text-center">
           Farm ID: <span className="font-mono">{farmId}</span>
         </p>

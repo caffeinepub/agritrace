@@ -17,6 +17,10 @@ export interface FarmRecord {
     phoneNumber: string;
     commodity: string;
     farmerName: string;
+    varieties: string | null;
+    farmSize: string | null;
+    coffeeTreeCount: string | null;
+    shadeTreePct: string | null;
 }
 export interface ScanEvent {
     timestamp: bigint;

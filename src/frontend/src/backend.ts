@@ -98,7 +98,11 @@ export interface FarmRecord {
     grade: string;
     phoneNumber: string;
     commodity: string;
+    varieties: string | null;
     farmerName: string;
+    farmSize: string | null;
+    coffeeTreeCount: string | null;
+    shadeTreePct: string | null;
 }
 export interface ScanEvent {
     timestamp: bigint;

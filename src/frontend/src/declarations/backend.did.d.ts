@@ -20,6 +20,10 @@ export interface FarmRecord {
   'phoneNumber' : string,
   'commodity' : string,
   'farmerName' : string,
+  'varieties' : [] | [string],
+  'farmSize' : [] | [string],
+  'coffeeTreeCount' : [] | [string],
+  'shadeTreePct' : [] | [string],
 }
 export interface ScanEvent {
   'timestamp' : bigint,

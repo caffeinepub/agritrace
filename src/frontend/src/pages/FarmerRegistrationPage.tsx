@@ -31,6 +31,7 @@ import {
   QrCode,
   RotateCcw,
   Sprout,
+  Trees,
   User,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
@@ -47,11 +48,20 @@ interface FormState {
   corporateName: string;
   phoneNumber: string;
   commodity: string;
+  variety1Name: string;
+  variety1Pct: string;
+  variety2Name: string;
+  variety2Pct: string;
+  variety3Name: string;
+  variety3Pct: string;
   grade: string;
   scoring: string;
   adminArea: string;
   mount: string;
   location: string;
+  farmSize: string;
+  coffeeTreeCount: string;
+  shadeTreePct: string;
 }
 
 const INITIAL_FORM: FormState = {
@@ -59,11 +69,20 @@ const INITIAL_FORM: FormState = {
   corporateName: "",
   phoneNumber: "",
   commodity: "",
+  variety1Name: "",
+  variety1Pct: "",
+  variety2Name: "",
+  variety2Pct: "",
+  variety3Name: "",
+  variety3Pct: "",
   grade: "",
   scoring: "",
   adminArea: "",
   mount: "",
   location: "",
+  farmSize: "",
+  coffeeTreeCount: "",
+  shadeTreePct: "",
 };
 
 const COFFEE_SPECIES = ["Arabica", "Robusta", "Liberica", "Excelsa"];
@@ -73,10 +92,9 @@ const COFFEE_GRADES = ["Specialty", "Premium", "Commercial", "Standard"];
  * Parse DMS component like 7°13'00.15"S → signed decimal degrees
  */
 function parseDMSPart(str: string): number | null {
-  // Match: degrees°minutes'seconds"direction  (direction: N/S/E/W)
   const match = str
     .trim()
-    .match(/^(\d+)[°\s](\d+)['\'\s](\d+(?:\.\d+)?)["\"\s]*([NSEWnsew])$/);
+    .match(/^(\d+)[°\s](\d+)['\'\s](\d+(?:\.\d+)?)[""\s]*([NSEWnsew])$/);
   if (!match) return null;
   const deg = Number.parseFloat(match[1]);
   const min = Number.parseFloat(match[2]);
@@ -86,16 +104,11 @@ function parseDMSPart(str: string): number | null {
   return dir === "S" || dir === "W" ? -decimal : decimal;
 }
 
-/**
- * Try to parse a DMS string like "7°13'00.15\"S 107°37'20.15\"E"
- */
 function parseDMS(
   location: string,
 ): { latitude: number; longitude: number } | null {
-  // Split on space but keep the direction letter attached
-  // Pattern: split between two coordinate groups
   const dmsPattern =
-    /^(\d+[°\s]\d+['\'\s]\d+(?:\.\d+)?["\"\s]*[NSns])\s+(\d+[°\s]\d+['\'\s]\d+(?:\.\d+)?["\"\s]*[EWew])$/;
+    /^(\d+[°\s]\d+['\'\s]\d+(?:\.\d+)?[""\s]*[NSns])\s+(\d+[°\s]\d+['\'\s]\d+(?:\.\d+)?[""\s]*[EWew])$/;
   const m = location.trim().match(dmsPattern);
   if (!m) return null;
   const lat = parseDMSPart(m[1]);
@@ -104,9 +117,6 @@ function parseDMS(
   return { latitude: lat, longitude: lng };
 }
 
-/**
- * Parse decimal format: "-7.21671, 107.62227" or "7.21671, 107.62227"
- */
 function parseDecimal(
   location: string,
 ): { latitude: number; longitude: number } | null {
@@ -122,6 +132,20 @@ function parseLocation(
   location: string,
 ): { latitude: number; longitude: number } | null {
   return parseDMS(location) ?? parseDecimal(location);
+}
+
+function encodeVarieties(form: FormState): string {
+  const parts: string[] = [];
+  if (form.variety1Name.trim()) {
+    parts.push(`${form.variety1Name.trim()}:${form.variety1Pct.trim() || "0"}`);
+  }
+  if (form.variety2Name.trim()) {
+    parts.push(`${form.variety2Name.trim()}:${form.variety2Pct.trim() || "0"}`);
+  }
+  if (form.variety3Name.trim()) {
+    parts.push(`${form.variety3Name.trim()}:${form.variety3Pct.trim() || "0"}`);
+  }
+  return parts.join("|");
 }
 
 export default function FarmerRegistrationPage() {
@@ -146,39 +170,44 @@ export default function FarmerRegistrationPage() {
           location: `${lat}, ${lng}`,
         }));
         setGeoLoading(false);
-        toast.success("Location captured successfully!");
+        toast.success("Location captured!");
       },
       (err) => {
         setGeoLoading(false);
-        toast.error(`Location error: ${err.message}`);
+        toast.error(
+          `Could not get location: ${err.message}. Please enter coordinates manually.`,
+        );
       },
-      { timeout: 10000 },
+      { enableHighAccuracy: true, timeout: 10000 },
     );
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!form.farmerName.trim()) return toast.error("Farmer name is required.");
-    if (!form.commodity) return toast.error("Coffee species is required.");
-    if (!form.grade) return toast.error("Grade is required.");
-    if (!form.adminArea.trim())
-      return toast.error("Administrative area is required.");
     const coords = parseLocation(form.location);
     if (!coords) {
-      return toast.error(
-        "Format lokasi tidak valid. Gunakan: 7°13'00.15\"S 107°37'20.15\"E atau -7.216710, 107.622270",
+      toast.error(
+        "Format koordinat tidak valid. Gunakan DMS (7°13'00.15\"S 107°37'20.15\"E) atau desimal (-7.216710, 107.622270).",
       );
+      return;
     }
 
-    const farmId = crypto.randomUUID();
+    if (!form.commodity) {
+      toast.error("Pilih Coffee Species terlebih dahulu.");
+      return;
+    }
+    if (!form.grade) {
+      toast.error("Pilih Grade terlebih dahulu.");
+      return;
+    }
 
-    const gradeValue = form.scoring.trim()
-      ? `${form.grade} — ${form.scoring.trim()}`
+    const farmId = `farm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const gradeValue = form.scoring
+      ? `${form.grade} \u2014 ${form.scoring}`
       : form.grade;
-
-    const adminAreaValue = form.mount.trim()
-      ? `${form.adminArea} | ${form.mount.trim()}`
+    const adminAreaValue = form.mount
+      ? `${form.adminArea} | ${form.mount}`
       : form.adminArea;
 
     const record: FarmRecord = {
@@ -186,17 +215,21 @@ export default function FarmerRegistrationPage() {
       corporateName: form.corporateName,
       phoneNumber: form.phoneNumber,
       commodity: form.commodity,
+      varieties: encodeVarieties(form) || null,
       grade: gradeValue,
       adminArea: adminAreaValue,
       latitude: coords.latitude,
       longitude: coords.longitude,
       createdAt: BigInt(Date.now()),
+      farmSize: form.farmSize || null,
+      coffeeTreeCount: form.coffeeTreeCount || null,
+      shadeTreePct: form.shadeTreePct || null,
     };
 
     try {
       await addFarmRecord.mutateAsync({ farmId, record });
       setSubmittedFarmId(farmId);
-      toast.success("Farm record registered successfully!");
+      toast.success("Farm registered successfully!");
     } catch (err: unknown) {
       toast.error("Failed to register farm record. Please try again.");
       console.error(err);
@@ -352,7 +385,7 @@ export default function FarmerRegistrationPage() {
                       <Input
                         id="phoneNumber"
                         data-ocid="registration.phoneNumber.input"
-                        placeholder="e.g. +62 812 3456 7890"
+                        placeholder="e.g. +62 812-3456-7890"
                         value={form.phoneNumber}
                         onChange={(e) =>
                           setForm((p) => ({
@@ -360,7 +393,6 @@ export default function FarmerRegistrationPage() {
                             phoneNumber: e.target.value,
                           }))
                         }
-                        type="tel"
                         className="font-sans"
                       />
                     </div>
@@ -373,82 +405,235 @@ export default function FarmerRegistrationPage() {
                       </Label>
                       <Select
                         value={form.commodity}
-                        onValueChange={(val) =>
-                          setForm((p) => ({ ...p, commodity: val, grade: "" }))
+                        onValueChange={(v) =>
+                          setForm((p) => ({
+                            ...p,
+                            commodity: v,
+                            grade: "",
+                            scoring: "",
+                          }))
                         }
                       >
                         <SelectTrigger
                           data-ocid="registration.commodity.select"
                           className="font-sans"
                         >
-                          <SelectValue placeholder="Pilih jenis kopi" />
+                          <SelectValue placeholder="Select coffee species" />
                         </SelectTrigger>
                         <SelectContent>
-                          {COFFEE_SPECIES.map((species) => (
-                            <SelectItem key={species} value={species}>
-                              {species}
+                          {COFFEE_SPECIES.map((s) => (
+                            <SelectItem key={s} value={s} className="font-sans">
+                              {s}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
 
-                    {/* Grade — hanya tampil setelah species dipilih */}
+                    {/* Varieties - shown after species selected */}
                     {form.commodity && (
-                      <div className="space-y-3">
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        className="space-y-3 rounded-lg border border-border p-4 bg-secondary/20"
+                      >
+                        <Label className="flex items-center gap-1.5 font-sans font-medium text-sm">
+                          <Sprout className="w-3.5 h-3.5 text-muted-foreground" />
+                          Coffee Variety Composition
+                        </Label>
+                        <p className="text-xs text-muted-foreground font-sans">
+                          Enter up to 3 varieties and their percentage
+                          composition.
+                        </p>
+                        {/* Variety 1 */}
+                        <div className="grid grid-cols-3 gap-2 items-end">
+                          <div className="col-span-2 space-y-1">
+                            <Label className="text-xs font-sans text-muted-foreground">
+                              Variety 1
+                            </Label>
+                            <Input
+                              data-ocid="registration.variety1Name.input"
+                              placeholder="e.g. Typica"
+                              value={form.variety1Name}
+                              onChange={(e) =>
+                                setForm((p) => ({
+                                  ...p,
+                                  variety1Name: e.target.value,
+                                }))
+                              }
+                              className="font-sans text-sm"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs font-sans text-muted-foreground">
+                              %
+                            </Label>
+                            <Input
+                              data-ocid="registration.variety1Pct.input"
+                              placeholder="e.g. 60"
+                              type="number"
+                              min="0"
+                              max="100"
+                              value={form.variety1Pct}
+                              onChange={(e) =>
+                                setForm((p) => ({
+                                  ...p,
+                                  variety1Pct: e.target.value,
+                                }))
+                              }
+                              className="font-sans text-sm"
+                            />
+                          </div>
+                        </div>
+                        {/* Variety 2 */}
+                        <div className="grid grid-cols-3 gap-2 items-end">
+                          <div className="col-span-2 space-y-1">
+                            <Label className="text-xs font-sans text-muted-foreground">
+                              Variety 2
+                            </Label>
+                            <Input
+                              data-ocid="registration.variety2Name.input"
+                              placeholder="e.g. Bourbon"
+                              value={form.variety2Name}
+                              onChange={(e) =>
+                                setForm((p) => ({
+                                  ...p,
+                                  variety2Name: e.target.value,
+                                }))
+                              }
+                              className="font-sans text-sm"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs font-sans text-muted-foreground">
+                              %
+                            </Label>
+                            <Input
+                              data-ocid="registration.variety2Pct.input"
+                              placeholder="e.g. 30"
+                              type="number"
+                              min="0"
+                              max="100"
+                              value={form.variety2Pct}
+                              onChange={(e) =>
+                                setForm((p) => ({
+                                  ...p,
+                                  variety2Pct: e.target.value,
+                                }))
+                              }
+                              className="font-sans text-sm"
+                            />
+                          </div>
+                        </div>
+                        {/* Variety 3 */}
+                        <div className="grid grid-cols-3 gap-2 items-end">
+                          <div className="col-span-2 space-y-1">
+                            <Label className="text-xs font-sans text-muted-foreground">
+                              Variety 3
+                            </Label>
+                            <Input
+                              data-ocid="registration.variety3Name.input"
+                              placeholder="e.g. Catimor"
+                              value={form.variety3Name}
+                              onChange={(e) =>
+                                setForm((p) => ({
+                                  ...p,
+                                  variety3Name: e.target.value,
+                                }))
+                              }
+                              className="font-sans text-sm"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs font-sans text-muted-foreground">
+                              %
+                            </Label>
+                            <Input
+                              data-ocid="registration.variety3Pct.input"
+                              placeholder="e.g. 10"
+                              type="number"
+                              min="0"
+                              max="100"
+                              value={form.variety3Pct}
+                              onChange={(e) =>
+                                setForm((p) => ({
+                                  ...p,
+                                  variety3Pct: e.target.value,
+                                }))
+                              }
+                              className="font-sans text-sm"
+                            />
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+
+                    {/* Grade - shown after species selected */}
+                    {form.commodity && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        className="space-y-1.5"
+                      >
                         <Label className="flex items-center gap-1.5 font-sans font-medium">
                           <Gauge className="w-3.5 h-3.5 text-muted-foreground" />
                           Grade
                         </Label>
-                        <div className="grid grid-cols-2 gap-3">
-                          {COFFEE_GRADES.map((g) => (
-                            <button
-                              key={g}
-                              type="button"
-                              data-ocid={`registration.grade.${g.toLowerCase()}.button`}
-                              onClick={() =>
-                                setForm((p) => ({
-                                  ...p,
-                                  grade: g,
-                                  scoring: "",
-                                }))
-                              }
-                              className={`rounded-lg border-2 px-4 py-3 text-sm font-semibold font-sans transition-all ${
-                                form.grade === g
-                                  ? "border-primary bg-primary/10 text-primary"
-                                  : "border-border bg-background text-foreground hover:border-primary/50"
-                              }`}
-                            >
-                              {g}
-                            </button>
-                          ))}
-                        </div>
-                        {/* Scoring — tampil setelah grade dipilih */}
-                        {form.grade && (
-                          <div className="space-y-1.5">
-                            <Label
-                              htmlFor="scoring"
-                              className="flex items-center gap-1.5 font-sans font-medium text-sm"
-                            >
-                              <Gauge className="w-3.5 h-3.5 text-muted-foreground" />
-                              Scoring
-                            </Label>
-                            <Input
-                              id="scoring"
-                              data-ocid="registration.scoring.input"
-                              placeholder="e.g. 87.5"
-                              value={form.scoring}
-                              onChange={(e) =>
-                                setForm((p) => ({
-                                  ...p,
-                                  scoring: e.target.value,
-                                }))
-                              }
-                              className="font-sans"
-                            />
-                          </div>
-                        )}
-                      </div>
+                        <Select
+                          value={form.grade}
+                          onValueChange={(v) =>
+                            setForm((p) => ({ ...p, grade: v, scoring: "" }))
+                          }
+                        >
+                          <SelectTrigger
+                            data-ocid="registration.grade.select"
+                            className="font-sans"
+                          >
+                            <SelectValue placeholder="Select grade" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {COFFEE_GRADES.map((g) => (
+                              <SelectItem
+                                key={g}
+                                value={g}
+                                className="font-sans"
+                              >
+                                {g}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </motion.div>
+                    )}
+
+                    {/* Scoring - shown after grade selected */}
+                    {form.grade && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        className="space-y-1.5"
+                      >
+                        <Label
+                          htmlFor="scoring"
+                          className="flex items-center gap-1.5 font-sans font-medium"
+                        >
+                          <Gauge className="w-3.5 h-3.5 text-muted-foreground" />
+                          Scoring
+                        </Label>
+                        <Input
+                          id="scoring"
+                          data-ocid="registration.scoring.input"
+                          placeholder="e.g. 87.5"
+                          value={form.scoring}
+                          onChange={(e) =>
+                            setForm((p) => ({
+                              ...p,
+                              scoring: e.target.value,
+                            }))
+                          }
+                          className="font-sans"
+                        />
+                      </motion.div>
                     )}
 
                     {/* Administrative Area */}
@@ -494,6 +679,84 @@ export default function FarmerRegistrationPage() {
                       />
                     </div>
 
+                    {/* Farm Size & Tree Info */}
+                    <div className="space-y-3 rounded-lg border border-border p-4 bg-secondary/20">
+                      <Label className="flex items-center gap-1.5 font-sans font-medium text-sm">
+                        <Trees className="w-3.5 h-3.5 text-muted-foreground" />
+                        Farm & Tree Information
+                      </Label>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="space-y-1.5">
+                          <Label
+                            htmlFor="farmSize"
+                            className="text-xs font-sans text-muted-foreground"
+                          >
+                            Farm Size (ha)
+                          </Label>
+                          <Input
+                            id="farmSize"
+                            data-ocid="registration.farmSize.input"
+                            placeholder="e.g. 5"
+                            value={form.farmSize}
+                            onChange={(e) =>
+                              setForm((p) => ({
+                                ...p,
+                                farmSize: e.target.value,
+                              }))
+                            }
+                            className="font-sans text-sm"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label
+                            htmlFor="coffeeTreeCount"
+                            className="text-xs font-sans text-muted-foreground"
+                          >
+                            Coffee Trees (pcs)
+                          </Label>
+                          <Input
+                            id="coffeeTreeCount"
+                            data-ocid="registration.coffeeTreeCount.input"
+                            placeholder="e.g. 1000"
+                            type="number"
+                            min="0"
+                            value={form.coffeeTreeCount}
+                            onChange={(e) =>
+                              setForm((p) => ({
+                                ...p,
+                                coffeeTreeCount: e.target.value,
+                              }))
+                            }
+                            className="font-sans text-sm"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label
+                            htmlFor="shadeTreePct"
+                            className="text-xs font-sans text-muted-foreground"
+                          >
+                            Shade Trees (%)
+                          </Label>
+                          <Input
+                            id="shadeTreePct"
+                            data-ocid="registration.shadeTreePct.input"
+                            placeholder="e.g. 30"
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={form.shadeTreePct}
+                            onChange={(e) =>
+                              setForm((p) => ({
+                                ...p,
+                                shadeTreePct: e.target.value,
+                              }))
+                            }
+                            className="font-sans text-sm"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
                     {/* Farm Location */}
                     <div className="space-y-2">
                       <Label
@@ -518,7 +781,7 @@ export default function FarmerRegistrationPage() {
                       <p className="text-xs text-muted-foreground font-sans">
                         Format DMS:{" "}
                         <span className="font-mono">
-                          7°13'00.15"S 107°37'20.15"E
+                          7°13'00.15&quot;S 107°37'20.15&quot;E
                         </span>
                         &nbsp;atau desimal:&nbsp;
                         <span className="font-mono">-7.216710, 107.622270</span>
@@ -647,6 +910,25 @@ export default function FarmerRegistrationPage() {
                         {form.commodity}
                       </p>
                     </div>
+                    {form.variety1Name && (
+                      <div className="col-span-2">
+                        <p className="text-muted-foreground text-xs">
+                          Varieties
+                        </p>
+                        <p className="font-semibold text-foreground">
+                          {[
+                            form.variety1Name &&
+                              `${form.variety1Name} ${form.variety1Pct ? `(${form.variety1Pct}%)` : ""}`,
+                            form.variety2Name &&
+                              `${form.variety2Name} ${form.variety2Pct ? `(${form.variety2Pct}%)` : ""}`,
+                            form.variety3Name &&
+                              `${form.variety3Name} ${form.variety3Pct ? `(${form.variety3Pct}%)` : ""}`,
+                          ]
+                            .filter(Boolean)
+                            .join(", ")}
+                        </p>
+                      </div>
+                    )}
                     <div>
                       <p className="text-muted-foreground text-xs">Grade</p>
                       <Badge
@@ -675,6 +957,36 @@ export default function FarmerRegistrationPage() {
                         <p className="text-muted-foreground text-xs">Mount</p>
                         <p className="font-semibold text-foreground">
                           {form.mount}
+                        </p>
+                      </div>
+                    )}
+                    {form.farmSize && (
+                      <div>
+                        <p className="text-muted-foreground text-xs">
+                          Farm Size
+                        </p>
+                        <p className="font-semibold text-foreground">
+                          {form.farmSize} ha
+                        </p>
+                      </div>
+                    )}
+                    {form.coffeeTreeCount && (
+                      <div>
+                        <p className="text-muted-foreground text-xs">
+                          Coffee Trees
+                        </p>
+                        <p className="font-semibold text-foreground">
+                          {form.coffeeTreeCount} pcs
+                        </p>
+                      </div>
+                    )}
+                    {form.shadeTreePct && (
+                      <div>
+                        <p className="text-muted-foreground text-xs">
+                          Shade Trees
+                        </p>
+                        <p className="font-semibold text-foreground">
+                          {form.shadeTreePct}%
                         </p>
                       </div>
                     )}
@@ -710,7 +1022,7 @@ export default function FarmerRegistrationPage() {
                       data-ocid="registration.qr_download.button"
                       onClick={handleDownloadQR}
                       variant="outline"
-                      className="flex-1 font-sans qr-download-btn"
+                      className="flex-1 font-sans"
                     >
                       <Download className="mr-2 h-4 w-4" />
                       Download QR Code
@@ -721,7 +1033,7 @@ export default function FarmerRegistrationPage() {
                       className="flex-1 font-sans hero-gradient border-0 text-white hover:opacity-90"
                     >
                       <RotateCcw className="mr-2 h-4 w-4" />
-                      Register Another Farm
+                      Register Another
                     </Button>
                   </div>
                 </CardContent>
