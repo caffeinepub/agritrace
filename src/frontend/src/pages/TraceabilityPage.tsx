@@ -26,7 +26,11 @@ import { useEffect } from "react";
 import { toast } from "sonner";
 import AppFooter from "../components/AppFooter";
 import { QRCodeSVG } from "../components/QRCode";
-import { useGetFarmRecord, useLogScan } from "../hooks/useQueries";
+import {
+  useGetFarmRecord,
+  useGetQrLogoUrl,
+  useLogScan,
+} from "../hooks/useQueries";
 
 function formatDate(bigintMs: bigint): string {
   const ms = Number(bigintMs);
@@ -77,6 +81,7 @@ export default function TraceabilityPage() {
   const { farmId } = useParams({ from: "/trace/$farmId" });
   const { data: farm, isLoading, isError } = useGetFarmRecord(farmId);
   const logScan = useLogScan();
+  const { data: qrLogoUrl = "" } = useGetQrLogoUrl();
   const logScanMutate = logScan.mutate;
 
   useEffect(() => {
@@ -357,12 +362,16 @@ export default function TraceabilityPage() {
                   value={qrValue}
                   size={160}
                   level="H"
-                  imageSettings={{
-                    src: "/assets/generated/agritrace-qr-logo-transparent.dim_80x80.png",
-                    height: 32,
-                    width: 32,
-                    excavate: true,
-                  }}
+                  {...(qrLogoUrl
+                    ? {
+                        imageSettings: {
+                          src: qrLogoUrl,
+                          height: 56,
+                          width: 56,
+                          excavate: true,
+                        },
+                      }
+                    : {})}
                 />
               </div>
               <p className="text-xs font-mono text-muted-foreground break-all text-center px-4">

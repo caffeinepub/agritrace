@@ -54,7 +54,9 @@ export interface _SERVICE {
   'getFarmRecord' : ActorMethod<[string], FarmRecord>,
   'getFarmScanStats' : ActorMethod<[string], ScanStats>,
   'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
+  'getQrLogoUrl' : ActorMethod<[], string>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
+  'setQrLogoUrl' : ActorMethod<[string], undefined>,
   'logScan' : ActorMethod<[string, string], undefined>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
 }

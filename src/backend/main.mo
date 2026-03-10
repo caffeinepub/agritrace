@@ -96,6 +96,7 @@ actor {
 
   let scanStats = Map.empty<Text, List.List<ScanEvent>>();
   let userProfiles = Map.empty<Principal, UserProfile>();
+  var qrLogoUrl : Text = "";
 
   // ── Authorization ──────────────────────────────────────────────────────────
   let accessControlState = AccessControl.initState();
@@ -223,6 +224,18 @@ actor {
     scanStats.values().flatMap(func(evts) { evts.values() })
       .toArray()
       .sort(ScanEvent.compareByTimestamp);
+  };
+
+  // ── QR Logo ───────────────────────────────────────────────────────────────
+  public query func getQrLogoUrl() : async Text {
+    qrLogoUrl
+  };
+
+  public shared ({ caller }) func setQrLogoUrl(url : Text) : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Only admins can set the QR logo");
+    };
+    qrLogoUrl := url;
   };
 
   // ── Helpers ────────────────────────────────────────────────────────────────

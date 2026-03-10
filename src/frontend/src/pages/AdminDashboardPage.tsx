@@ -51,7 +51,9 @@ import {
   useAssignSelfAsAdmin,
   useGetAllFarmRecords,
   useGetAllScanStats,
+  useGetQrLogoUrl,
   useIsCallerAdmin,
+  useSetQrLogoUrl,
 } from "../hooks/useQueries";
 
 // Lazy-load the map to avoid SSR issues
@@ -273,6 +275,14 @@ export default function AdminDashboardPage() {
               <BarChart3 className="w-4 h-4" />
               <span>Scan Analytics</span>
             </TabsTrigger>
+            <TabsTrigger
+              value="qrlogo"
+              data-ocid="admin.qrlogo.tab"
+              className="flex items-center gap-1.5"
+            >
+              <QrCode className="w-4 h-4" />
+              <span>QR Logo</span>
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="records">
@@ -285,6 +295,9 @@ export default function AdminDashboardPage() {
 
           <TabsContent value="analytics">
             <AnalyticsTab />
+          </TabsContent>
+          <TabsContent value="qrlogo">
+            <QrLogoTab />
           </TabsContent>
         </Tabs>
       </main>
@@ -714,6 +727,145 @@ function StatCard({
             {icon}
           </div>
         </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ─── QR Logo Tab ─────────────────────────────────────────────────── */
+function QrLogoTab() {
+  const { data: currentLogoUrl = "", isLoading } = useGetQrLogoUrl();
+  const setQrLogoUrl = useSetQrLogoUrl();
+  const [inputUrl, setInputUrl] = useState(currentLogoUrl);
+  const [previewUrl, setPreviewUrl] = useState(currentLogoUrl);
+
+  // Sync input when data loads
+  if (!isLoading && inputUrl === "" && currentLogoUrl !== "") {
+    setInputUrl(currentLogoUrl);
+    setPreviewUrl(currentLogoUrl);
+  }
+
+  const handleSave = async () => {
+    try {
+      await setQrLogoUrl.mutateAsync(inputUrl);
+      setPreviewUrl(inputUrl);
+      toast.success("Logo QR berhasil disimpan!");
+    } catch {
+      toast.error("Gagal menyimpan logo. Pastikan kamu adalah admin.");
+    }
+  };
+
+  const handleClear = async () => {
+    try {
+      await setQrLogoUrl.mutateAsync("");
+      setInputUrl("");
+      setPreviewUrl("");
+      toast.success("Logo QR berhasil dihapus.");
+    } catch {
+      toast.error("Gagal menghapus logo.");
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="font-display flex items-center gap-2">
+          <QrCode className="w-5 h-5" />
+          Pengaturan Logo QR Code
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {isLoading ? (
+          <div data-ocid="admin.qrlogo.loading_state" className="space-y-3">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-32 w-32" />
+          </div>
+        ) : (
+          <>
+            {/* Current logo preview */}
+            {previewUrl && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium font-sans text-muted-foreground">
+                  Preview Logo Saat Ini
+                </p>
+                <div className="inline-flex items-center justify-center p-4 bg-white rounded-xl border border-border shadow-sm">
+                  <img
+                    src={previewUrl}
+                    alt="QR Logo"
+                    className="w-20 h-20 object-contain"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = "none";
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* URL input */}
+            <div className="space-y-2">
+              <label
+                className="text-sm font-medium font-sans"
+                htmlFor="qr-logo-url"
+              >
+                URL Logo
+              </label>
+              <Input
+                id="qr-logo-url"
+                data-ocid="admin.qrlogo.input"
+                type="url"
+                placeholder="https://contoh.com/logo.png"
+                value={inputUrl}
+                onChange={(e) => setInputUrl(e.target.value)}
+                className="font-sans"
+              />
+              <p className="text-xs text-muted-foreground font-sans">
+                Masukkan URL gambar logo yang akan ditampilkan di tengah QR
+                code. Gunakan gambar dengan latar belakang transparan (PNG)
+                untuk hasil terbaik.
+              </p>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex gap-3">
+              <Button
+                data-ocid="admin.qrlogo.save_button"
+                onClick={handleSave}
+                disabled={setQrLogoUrl.isPending}
+                className="font-sans"
+              >
+                {setQrLogoUrl.isPending ? "Menyimpan..." : "Simpan Logo"}
+              </Button>
+              {previewUrl && (
+                <Button
+                  data-ocid="admin.qrlogo.delete_button"
+                  onClick={handleClear}
+                  variant="outline"
+                  disabled={setQrLogoUrl.isPending}
+                  className="font-sans text-destructive border-destructive/30 hover:bg-destructive/10"
+                >
+                  Hapus Logo
+                </Button>
+              )}
+            </div>
+
+            {setQrLogoUrl.isSuccess && (
+              <p
+                data-ocid="admin.qrlogo.success_state"
+                className="text-sm text-green-600 font-sans"
+              >
+                ✓ Logo berhasil diperbarui
+              </p>
+            )}
+            {setQrLogoUrl.isError && (
+              <p
+                data-ocid="admin.qrlogo.error_state"
+                className="text-sm text-destructive font-sans"
+              >
+                Gagal menyimpan. Pastikan kamu memiliki hak akses admin.
+              </p>
+            )}
+          </>
+        )}
       </CardContent>
     </Card>
   );

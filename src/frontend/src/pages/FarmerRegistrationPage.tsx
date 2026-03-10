@@ -41,7 +41,7 @@ import type { FarmRecord } from "../backend.d";
 import AppFooter from "../components/AppFooter";
 import AppHeader from "../components/AppHeader";
 import { QRCodeSVG } from "../components/QRCode";
-import { useAddFarmRecord } from "../hooks/useQueries";
+import { useAddFarmRecord, useGetQrLogoUrl } from "../hooks/useQueries";
 
 interface FormState {
   farmerName: string;
@@ -154,6 +154,7 @@ export default function FarmerRegistrationPage() {
   const [submittedFarmId, setSubmittedFarmId] = useState<string | null>(null);
 
   const addFarmRecord = useAddFarmRecord();
+  const { data: qrLogoUrl = "" } = useGetQrLogoUrl();
 
   const handleCapture = useCallback(() => {
     if (!navigator.geolocation) {
@@ -1003,12 +1004,16 @@ export default function FarmerRegistrationPage() {
                       value={qrValue}
                       size={200}
                       level="H"
-                      imageSettings={{
-                        src: "/assets/generated/agritrace-qr-logo-transparent.dim_80x80.png",
-                        height: 40,
-                        width: 40,
-                        excavate: true,
-                      }}
+                      {...(qrLogoUrl
+                        ? {
+                            imageSettings: {
+                              src: qrLogoUrl,
+                              height: 70,
+                              width: 70,
+                              excavate: true,
+                            },
+                          }
+                        : {})}
                     />
                   </motion.div>
 
