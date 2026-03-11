@@ -24,6 +24,8 @@ function farmRecordToCandid(record: FarmRecord): unknown {
     farmSize: optToCandid(record.farmSize),
     coffeeTreeCount: optToCandid(record.coffeeTreeCount),
     shadeTreePct: optToCandid(record.shadeTreePct),
+    areaCode: [],
+    sequenceNumber: BigInt(0),
   };
 }
 
@@ -43,6 +45,8 @@ function farmRecordFromCandid(raw: unknown): FarmRecord {
     farmSize: optFromCandid(r.farmSize as [] | [string] | null),
     coffeeTreeCount: optFromCandid(r.coffeeTreeCount as [] | [string] | null),
     shadeTreePct: optFromCandid(r.shadeTreePct as [] | [string] | null),
+    sequenceNumber: BigInt(Number(r.sequenceNumber ?? 0)) as bigint,
+    areaCode: optFromCandid(r.areaCode as [] | [string] | null),
   };
 }
 
@@ -68,6 +72,22 @@ export function useGetAllFarmRecords() {
       if (!actor) return [];
       const records = await actor.getAllFarmRecords();
       return records.map(farmRecordFromCandid);
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useGetAllFarmRecordsWithIds() {
+  const { actor, isFetching } = useActor();
+  return useQuery<Array<[string, FarmRecord]>>({
+    queryKey: ["allFarmRecordsWithIds"],
+    queryFn: async () => {
+      if (!actor) return [];
+      const raw = await (actor as any).getAllFarmRecordsWithIds();
+      return raw.map(([id, record]: [string, unknown]) => [
+        id,
+        farmRecordFromCandid(record),
+      ]);
     },
     enabled: !!actor && !isFetching,
   });
@@ -116,14 +136,18 @@ export function useAddFarmRecord() {
     mutationFn: async ({
       farmId,
       record,
-    }: { farmId: string; record: FarmRecord }) => {
+    }: { farmId: string; record: FarmRecord }): Promise<bigint> => {
       if (!actor) throw new Error("Actor not available");
       // Convert optional fields to Candid [] | [string] format before sending
       const candidRecord = farmRecordToCandid(record);
-      return actor.addFarmRecord(farmId, candidRecord as FarmRecord);
+      return (actor as any).addFarmRecord(
+        farmId,
+        candidRecord as FarmRecord,
+      ) as Promise<bigint>;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["allFarmRecords"] });
+      queryClient.invalidateQueries({ queryKey: ["allFarmRecordsWithIds"] });
     },
   });
 }
@@ -183,6 +207,21 @@ export function useSetQrLogoUrl() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["qrLogoUrl"] });
+    },
+  });
+}
+
+export function useSetFarmAreaCode() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ farmId, code }: { farmId: string; code: string }) => {
+      if (!actor) throw new Error("Actor not available");
+      return (actor as any).setFarmAreaCode(farmId, code);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["allFarmRecordsWithIds"] });
+      queryClient.invalidateQueries({ queryKey: ["allFarmRecords"] });
     },
   });
 }

@@ -23,7 +23,6 @@ import {
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect } from "react";
-import { toast } from "sonner";
 import AppFooter from "../components/AppFooter";
 import { QRCodeSVG } from "../components/QRCode";
 import {
@@ -41,6 +40,15 @@ function formatDate(bigintMs: bigint): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function formatMemberNumber(
+  sequenceNumber: bigint | number,
+  areaCode: string | null,
+): string {
+  const seq = String(Number(sequenceNumber)).padStart(4, "0");
+  if (areaCode) return `${areaCode.toUpperCase()}${seq}`;
+  return `--${seq}`;
 }
 
 const GRADE_COLORS: Record<string, string> = {
@@ -186,6 +194,9 @@ export default function TraceabilityPage() {
                   <CardTitle className="font-display text-xl">
                     {farm.farmerName}
                   </CardTitle>
+                  <p className="text-sm font-mono font-bold text-primary mt-0.5">
+                    {formatMemberNumber(farm.sequenceNumber, farm.areaCode)}
+                  </p>
                   <p className="text-muted-foreground font-sans text-sm mt-0.5">
                     {adminArea}
                   </p>
@@ -377,6 +388,18 @@ export default function TraceabilityPage() {
               <p className="text-xs font-mono text-muted-foreground break-all text-center px-4">
                 {qrValue}
               </p>
+              {/* Member Number below QR */}
+              <div
+                className="flex flex-col items-center gap-0.5"
+                data-ocid="trace.member_number.card"
+              >
+                <p className="text-xs text-muted-foreground font-sans">
+                  Nomor Anggota
+                </p>
+                <p className="text-xl font-display font-bold tracking-widest text-foreground">
+                  {formatMemberNumber(farm.sequenceNumber, farm.areaCode)}
+                </p>
+              </div>
             </CardContent>
           </Card>
         </motion.div>

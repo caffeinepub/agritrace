@@ -88,6 +88,15 @@ const INITIAL_FORM: FormState = {
 const COFFEE_SPECIES = ["Arabica", "Robusta", "Liberica", "Excelsa"];
 const COFFEE_GRADES = ["Specialty", "Premium", "Commercial", "Standard"];
 
+function formatMemberNumber(
+  sequenceNumber: bigint | number,
+  areaCode: string | null,
+): string {
+  const seq = String(Number(sequenceNumber)).padStart(4, "0");
+  if (areaCode) return `${areaCode.toUpperCase()}${seq}`;
+  return `--${seq}`;
+}
+
 /**
  * Parse DMS component like 7°13'00.15"S → signed decimal degrees
  */
@@ -152,6 +161,7 @@ export default function FarmerRegistrationPage() {
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
   const [geoLoading, setGeoLoading] = useState(false);
   const [submittedFarmId, setSubmittedFarmId] = useState<string | null>(null);
+  const [submittedSeqNum, setSubmittedSeqNum] = useState<bigint | null>(null);
 
   const addFarmRecord = useAddFarmRecord();
   const { data: qrLogoUrl = "" } = useGetQrLogoUrl();
@@ -225,11 +235,14 @@ export default function FarmerRegistrationPage() {
       farmSize: form.farmSize || null,
       coffeeTreeCount: form.coffeeTreeCount || null,
       shadeTreePct: form.shadeTreePct || null,
+      sequenceNumber: BigInt(0),
+      areaCode: null,
     };
 
     try {
-      await addFarmRecord.mutateAsync({ farmId, record });
+      const seqNum = await addFarmRecord.mutateAsync({ farmId, record });
       setSubmittedFarmId(farmId);
+      setSubmittedSeqNum(seqNum);
       toast.success("Farm registered successfully!");
     } catch (err: unknown) {
       toast.error("Failed to register farm record. Please try again.");
@@ -258,6 +271,7 @@ export default function FarmerRegistrationPage() {
   const handleReset = () => {
     setForm(INITIAL_FORM);
     setSubmittedFarmId(null);
+    setSubmittedSeqNum(null);
   };
 
   const qrValue = submittedFarmId
@@ -1016,6 +1030,22 @@ export default function FarmerRegistrationPage() {
                         : {})}
                     />
                   </motion.div>
+
+                  {/* Member Number */}
+                  <div
+                    className="flex flex-col items-center gap-1"
+                    data-ocid="registration.member_number.card"
+                  >
+                    <p className="text-xs text-muted-foreground font-sans">
+                      Nomor Anggota
+                    </p>
+                    <p className="text-2xl font-display font-bold tracking-widest text-foreground">
+                      {formatMemberNumber(submittedSeqNum ?? BigInt(0), null)}
+                    </p>
+                    <p className="text-xs text-muted-foreground font-sans text-center max-w-xs">
+                      Kode area akan ditetapkan oleh admin setelah verifikasi
+                    </p>
+                  </div>
 
                   <p className="text-xs text-muted-foreground font-sans text-center max-w-xs">
                     Scan this code to view the farm traceability record.

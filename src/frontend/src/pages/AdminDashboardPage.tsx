@@ -9,6 +9,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -25,6 +26,7 @@ import {
   Apple,
   ArrowLeft,
   BarChart3,
+  Edit,
   Leaf,
   LogIn,
   MapIcon,
@@ -50,9 +52,11 @@ import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   useAssignSelfAsAdmin,
   useGetAllFarmRecords,
+  useGetAllFarmRecordsWithIds,
   useGetAllScanStats,
   useGetQrLogoUrl,
   useIsCallerAdmin,
+  useSetFarmAreaCode,
   useSetQrLogoUrl,
 } from "../hooks/useQueries";
 
@@ -75,6 +79,15 @@ function formatBigintDate(ts: bigint): string {
   });
 }
 
+function formatMemberNumber(
+  sequenceNumber: bigint | number,
+  areaCode: string | null,
+): string {
+  const seq = String(Number(sequenceNumber)).padStart(4, "0");
+  if (areaCode) return `${areaCode.toUpperCase()}${seq}`;
+  return `--${seq}`;
+}
+
 function DeviceIcon({ device }: { device: "iPhone" | "Android" | "PC" }) {
   if (device === "iPhone")
     return <Apple className="w-4 h-4 text-muted-foreground" />;
@@ -94,6 +107,7 @@ export default function AdminDashboardPage() {
 
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ["allFarmRecords"] });
+    queryClient.invalidateQueries({ queryKey: ["allFarmRecordsWithIds"] });
     queryClient.invalidateQueries({ queryKey: ["allScanStats"] });
     queryClient.invalidateQueries({ queryKey: ["isCallerAdmin"] });
     toast.success("Data refreshed");
@@ -149,9 +163,9 @@ export default function AdminDashboardPage() {
               </p>
               <Button
                 data-ocid="admin.login.button"
-                onClick={() => login()}
+                onClick={login}
                 disabled={isLoggingIn}
-                className="w-full font-sans hero-gradient border-0 text-white hover:opacity-90"
+                className="w-full font-sans hero-gradient border-0 text-white"
               >
                 <LogIn className="mr-2 h-4 w-4" />
                 {isLoggingIn ? "Logging in…" : "Login with Internet Identity"}
@@ -164,8 +178,8 @@ export default function AdminDashboardPage() {
     );
   }
 
-  // Access denied
-  if (isAdmin === false) {
+  // Not admin
+  if (!isAdmin) {
     return (
       <div className="min-h-screen flex flex-col bg-background">
         <AppHeader />
@@ -179,26 +193,27 @@ export default function AdminDashboardPage() {
                 <ShieldX className="w-7 h-7 text-destructive" />
               </div>
               <h2 className="font-display text-xl font-bold mb-2">
-                Akses Ditolak
+                Access Denied
               </h2>
-              <p className="text-muted-foreground font-sans text-sm mb-4">
-                Akun kamu belum terdaftar sebagai admin. Jika kamu adalah
-                pemilik aplikasi ini, klik tombol di bawah untuk mendaftarkan
-                diri sebagai admin pertama.
+              <p className="text-muted-foreground font-sans text-sm mb-6">
+                Akun kamu belum terdaftar sebagai admin.
               </p>
               <Button
                 data-ocid="admin.self_register.button"
                 onClick={handleSelfRegisterAdmin}
                 disabled={assignSelfAsAdmin.isPending}
-                className="w-full font-sans hero-gradient border-0 text-white hover:opacity-90 mb-3"
+                className="w-full font-sans hero-gradient border-0 text-white mb-3"
               >
-                <ShieldCheck className="mr-2 h-4 w-4" />
                 {assignSelfAsAdmin.isPending
                   ? "Mendaftarkan…"
                   : "Jadikan Saya Admin"}
               </Button>
-              <Link to="/" data-ocid="admin.home.link">
-                <Button variant="outline" className="w-full font-sans">
+              <Link to="/">
+                <Button
+                  variant="outline"
+                  className="w-full font-sans"
+                  data-ocid="admin.home.link"
+                >
                   <ArrowLeft className="mr-2 h-4 w-4" />
                   Kembali ke Beranda
                 </Button>
@@ -215,38 +230,30 @@ export default function AdminDashboardPage() {
     <div className="min-h-screen flex flex-col bg-background">
       <AppHeader />
 
-      {/* Admin Hero */}
-      <section className="hero-gradient text-white py-8 px-4">
-        <div className="max-w-5xl mx-auto flex items-center justify-between">
+      <main className="flex-1 max-w-5xl mx-auto w-full px-4 py-10">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <ShieldCheck className="w-5 h-5 text-white/80" />
-              <Badge className="bg-white/20 text-white border-white/30 text-xs font-sans">
-                Admin Dashboard
-              </Badge>
-            </div>
-            <h1 className="font-display text-2xl sm:text-3xl font-bold">
+            <h1 className="font-display text-2xl font-bold text-foreground">
               AgriTrace Control Center
             </h1>
-            <p className="text-white/70 text-sm font-sans mt-1">
-              Manage farms, monitor locations, and view analytics
+            <p className="text-muted-foreground font-sans text-sm mt-0.5">
+              Farm management and traceability dashboard
             </p>
           </div>
           <Button
             data-ocid="admin.refresh.button"
-            onClick={handleRefresh}
-            variant="ghost"
+            variant="outline"
             size="sm"
-            className="text-white hover:bg-white/20 font-sans hidden sm:flex"
+            onClick={handleRefresh}
+            className="font-sans gap-1.5"
           >
-            <RefreshCcw className="mr-1.5 h-4 w-4" />
+            <RefreshCcw className="w-4 h-4" />
             Refresh
           </Button>
         </div>
-      </section>
 
-      <main className="flex-1 max-w-5xl mx-auto w-full px-4 py-8">
-        <Tabs defaultValue="records" className="w-full">
+        <Tabs defaultValue="records">
           <TabsList
             className="w-full sm:w-auto mb-6 font-sans"
             data-ocid="admin.tabs.tab"
@@ -307,18 +314,64 @@ export default function AdminDashboardPage() {
   );
 }
 
+/* ─── SetAreaCodeForm ─────────────────────────────────────────────── */
+function SetAreaCodeForm({
+  farmId,
+  currentCode,
+}: { farmId: string; currentCode: string | null }) {
+  const [code, setCode] = useState(currentCode ?? "");
+  const setFarmAreaCode = useSetFarmAreaCode();
+  const queryClient = useQueryClient();
+
+  const handleSave = async () => {
+    try {
+      await setFarmAreaCode.mutateAsync({ farmId, code: code.toUpperCase() });
+      toast.success("Kode area berhasil disimpan!");
+      queryClient.invalidateQueries({ queryKey: ["allFarmRecordsWithIds"] });
+    } catch {
+      toast.error("Gagal menyimpan kode area.");
+    }
+  };
+
+  return (
+    <div className="space-y-4 py-2">
+      <div className="space-y-2">
+        <Label>Kode Area (1 huruf, contoh: D)</Label>
+        <Input
+          value={code}
+          onChange={(e) => setCode(e.target.value.slice(0, 1))}
+          placeholder="D"
+          maxLength={1}
+          className="font-mono text-center text-2xl uppercase"
+          data-ocid="admin.areacode.input"
+        />
+      </div>
+      <Button
+        onClick={handleSave}
+        disabled={!code || setFarmAreaCode.isPending}
+        className="w-full"
+        data-ocid="admin.areacode.save_button"
+      >
+        {setFarmAreaCode.isPending ? "Menyimpan..." : "Simpan"}
+      </Button>
+    </div>
+  );
+}
+
 /* ─── Tab 1: Farm Records ─────────────────────────────────────────── */
 function FarmRecordsTab() {
-  const { data: farms, isLoading, isError } = useGetAllFarmRecords();
+  const {
+    data: farmsWithIds,
+    isLoading,
+    isError,
+  } = useGetAllFarmRecordsWithIds();
   const [search, setSearch] = useState("");
   const [selectedFarm, setSelectedFarm] = useState<
     (FarmRecord & { _farmId: string }) | null
   >(null);
 
-  // We have to store farmId alongside the record for QR generation
-  // getAllFarmRecords() returns Array<FarmRecord> — we'll use index as key reference
-  const filteredFarms = (farms ?? []).filter((f) =>
-    [f.farmerName, f.commodity, f.grade, f.adminArea]
+  const filteredFarms = (farmsWithIds ?? []).filter(([, farm]) =>
+    [farm.farmerName, farm.commodity, farm.grade, farm.adminArea]
       .join(" ")
       .toLowerCase()
       .includes(search.toLowerCase()),
@@ -375,6 +428,9 @@ function FarmRecordsTab() {
                     Farmer Name
                   </TableHead>
                   <TableHead className="font-display font-semibold">
+                    Nomor Anggota
+                  </TableHead>
+                  <TableHead className="font-display font-semibold">
                     Commodity
                   </TableHead>
                   <TableHead className="font-display font-semibold">
@@ -390,7 +446,7 @@ function FarmRecordsTab() {
                     Registered
                   </TableHead>
                   <TableHead className="font-display font-semibold text-right">
-                    QR
+                    QR / Kode
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -398,7 +454,7 @@ function FarmRecordsTab() {
                 {filteredFarms.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={7}
+                      colSpan={8}
                       className="text-center py-10 text-muted-foreground font-sans"
                       data-ocid="admin.records.empty_state"
                     >
@@ -407,14 +463,22 @@ function FarmRecordsTab() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredFarms.map((farm, idx) => (
+                  filteredFarms.map(([farmId, farm], idx) => (
                     <TableRow
-                      key={`${farm.farmerName}-${Number(farm.createdAt)}`}
+                      key={`${farmId}-${Number(farm.createdAt)}`}
                       data-ocid={`admin.records.row.${idx + 1}`}
                       className="hover:bg-muted/30 font-sans"
                     >
                       <TableCell className="font-medium">
                         {farm.farmerName}
+                      </TableCell>
+                      <TableCell>
+                        <span className="font-mono font-bold text-sm text-primary">
+                          {formatMemberNumber(
+                            farm.sequenceNumber,
+                            farm.areaCode,
+                          )}
+                        </span>
                       </TableCell>
                       <TableCell>{farm.commodity}</TableCell>
                       <TableCell>
@@ -437,33 +501,56 @@ function FarmRecordsTab() {
                         {formatBigintDate(farm.createdAt)}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button
-                              data-ocid={`admin.records.qr.${idx + 1}`}
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                // Use a generated farmId from the record's creation time + index as stable key
-                                const farmId = `farm-${Number(farm.createdAt)}-${idx}`;
-                                setSelectedFarm({ ...farm, _farmId: farmId });
-                              }}
+                        <div className="flex items-center justify-end gap-1">
+                          {/* Set Area Code Dialog */}
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                data-ocid={`admin.records.areacode.${idx + 1}`}
+                              >
+                                <Edit className="w-3 h-3" />
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-xs">
+                              <DialogHeader>
+                                <DialogTitle>Set Kode Area</DialogTitle>
+                              </DialogHeader>
+                              <SetAreaCodeForm
+                                farmId={farmId}
+                                currentCode={farm.areaCode}
+                              />
+                            </DialogContent>
+                          </Dialog>
+
+                          {/* QR Code Dialog */}
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button
+                                data-ocid={`admin.records.qr.${idx + 1}`}
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedFarm({ ...farm, _farmId: farmId });
+                                }}
+                              >
+                                <QrCode className="w-4 h-4" />
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent
+                              className="max-w-sm"
+                              data-ocid="admin.records.qr.dialog"
                             >
-                              <QrCode className="w-4 h-4" />
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent
-                            className="max-w-sm"
-                            data-ocid="admin.records.qr.dialog"
-                          >
-                            <DialogHeader>
-                              <DialogTitle className="font-display">
-                                QR Code
-                              </DialogTitle>
-                            </DialogHeader>
-                            {selectedFarm && <QRModal farm={selectedFarm} />}
-                          </DialogContent>
-                        </Dialog>
+                              <DialogHeader>
+                                <DialogTitle className="font-display">
+                                  QR Code
+                                </DialogTitle>
+                              </DialogHeader>
+                              {selectedFarm && <QRModal farm={selectedFarm} />}
+                            </DialogContent>
+                          </Dialog>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))

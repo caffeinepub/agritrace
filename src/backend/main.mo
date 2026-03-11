@@ -7,6 +7,7 @@ import Map "mo:core/Map";
 import Runtime "mo:core/Runtime";
 import Float "mo:core/Float";
 import Int "mo:core/Int";
+import Nat "mo:core/Nat";
 import List "mo:core/List";
 import Principal "mo:core/Principal";
 
@@ -18,9 +19,7 @@ import MixinAuthorization "authorization/MixinAuthorization";
 actor {
   // ── Types ──────────────────────────────────────────────────────────────────
 
-  // FarmRecord_v1 kept here ONLY so the upgrade can read the old stable data
-  // (previous deployment stored this under the name `farmRecords`).
-  // Do NOT use FarmRecord_v1 in any new code.
+  // v1: original shape (no optional fields)
   type FarmRecord_v1 = {
     farmerName : Text;
     corporateName : Text;
@@ -33,8 +32,24 @@ actor {
     createdAt : Int;
   };
 
-  // Current record type – new fields are optional so old v1 data can be
-  // deserialized with null defaults during upgrade.
+  // v2: added optional traceability fields (no sequenceNumber/areaCode)
+  type FarmRecord_v2 = {
+    farmerName : Text;
+    corporateName : Text;
+    phoneNumber : Text;
+    commodity : Text;
+    grade : Text;
+    adminArea : Text;
+    latitude : Float;
+    longitude : Float;
+    createdAt : Int;
+    varieties : ?Text;
+    farmSize : ?Text;
+    coffeeTreeCount : ?Text;
+    shadeTreePct : ?Text;
+  };
+
+  // v3 (current): added sequenceNumber and areaCode
   type FarmRecord = {
     farmerName : Text;
     corporateName : Text;
@@ -49,6 +64,8 @@ actor {
     farmSize : ?Text;
     coffeeTreeCount : ?Text;
     shadeTreePct : ?Text;
+    sequenceNumber : Nat;
+    areaCode : ?Text;
   };
 
   module FarmRecord {
@@ -84,49 +101,77 @@ actor {
     organization : Text;
   };
 
-  // ── Stable state ───────────────────────────────────────────────────────────
+  // ── Stable state ─────────────────────────────────────────────────────────────────
 
-  // `farmRecords` retains the OLD name so the runtime can read the previous
-  // stable data (stored as FarmRecord_v1 nodes) and leave it in place.
-  // We never write to this map after postupgrade.
+  // v1 storage kept read-only for migration
   let farmRecords : Map.Map<Text, FarmRecord_v1> = Map.empty<Text, FarmRecord_v1>();
 
-  // New storage for the current FarmRecord shape.
-  let farmRecords_v2 : Map.Map<Text, FarmRecord> = Map.empty<Text, FarmRecord>();
+  // v2 storage kept read-only for migration (previous deployment wrote here)
+  let farmRecords_v2 : Map.Map<Text, FarmRecord_v2> = Map.empty<Text, FarmRecord_v2>();
+
+  // v3 storage: current shape with sequenceNumber + areaCode
+  let farmRecords_v3 : Map.Map<Text, FarmRecord> = Map.empty<Text, FarmRecord>();
 
   let scanStats = Map.empty<Text, List.List<ScanEvent>>();
   let userProfiles = Map.empty<Principal, UserProfile>();
   var qrLogoUrl : Text = "";
+  var farmSequenceCounter : Nat = 0;
 
-  // ── Authorization ──────────────────────────────────────────────────────────
+  // ── Authorization ────────────────────────────────────────────────────────────────
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
 
-  // ── Migration: copy v1 records into v2 on first upgrade ───────────────────
+  // ── Migration: copy older records into v3 on upgrade ────────────────────────
   system func postupgrade() {
+    // Migrate v1 → v3
     for ((k, v) in farmRecords.entries()) {
-      // Only migrate if not already present in v2
-      if (farmRecords_v2.get(k) == null) {
-        farmRecords_v2.add(k, {
-          farmerName    = v.farmerName;
-          corporateName = v.corporateName;
-          phoneNumber   = v.phoneNumber;
-          commodity     = v.commodity;
-          grade         = v.grade;
-          adminArea     = v.adminArea;
-          latitude      = v.latitude;
-          longitude     = v.longitude;
-          createdAt     = v.createdAt;
-          varieties     = null;
-          farmSize      = null;
+      if (farmRecords_v3.get(k) == null) {
+        farmSequenceCounter += 1;
+        farmRecords_v3.add(k, {
+          farmerName      = v.farmerName;
+          corporateName   = v.corporateName;
+          phoneNumber     = v.phoneNumber;
+          commodity       = v.commodity;
+          grade           = v.grade;
+          adminArea       = v.adminArea;
+          latitude        = v.latitude;
+          longitude       = v.longitude;
+          createdAt       = v.createdAt;
+          varieties       = null;
+          farmSize        = null;
           coffeeTreeCount = null;
-          shadeTreePct  = null;
+          shadeTreePct    = null;
+          sequenceNumber  = farmSequenceCounter;
+          areaCode        = null;
+        });
+      };
+    };
+    // Migrate v2 → v3
+    for ((k, v) in farmRecords_v2.entries()) {
+      if (farmRecords_v3.get(k) == null) {
+        farmSequenceCounter += 1;
+        farmRecords_v3.add(k, {
+          farmerName      = v.farmerName;
+          corporateName   = v.corporateName;
+          phoneNumber     = v.phoneNumber;
+          commodity       = v.commodity;
+          grade           = v.grade;
+          adminArea       = v.adminArea;
+          latitude        = v.latitude;
+          longitude       = v.longitude;
+          createdAt       = v.createdAt;
+          varieties       = v.varieties;
+          farmSize        = v.farmSize;
+          coffeeTreeCount = v.coffeeTreeCount;
+          shadeTreePct    = v.shadeTreePct;
+          sequenceNumber  = farmSequenceCounter;
+          areaCode        = null;
         });
       };
     };
   };
 
-  // ── User Profile Management ────────────────────────────────────────────────
+  // ── User Profile Management ────────────────────────────────────────────────────
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can access profiles");
@@ -148,36 +193,80 @@ actor {
     userProfiles.add(caller, profile);
   };
 
-  // ── Farm Records ───────────────────────────────────────────────────────────
-  public shared ({ caller }) func addFarmRecord(farmId : Text, record : FarmRecord) : async () {
+  // ── Farm Records ───────────────────────────────────────────────────────────────────
+  // Returns the sequence number assigned to the new record
+  public shared ({ caller }) func addFarmRecord(farmId : Text, record : FarmRecord) : async Nat {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can add farm records");
     };
-    farmRecords_v2.add(farmId, record);
+    farmSequenceCounter += 1;
+    let seq = farmSequenceCounter;
+    farmRecords_v3.add(farmId, {
+      farmerName      = record.farmerName;
+      corporateName   = record.corporateName;
+      phoneNumber     = record.phoneNumber;
+      commodity       = record.commodity;
+      grade           = record.grade;
+      adminArea       = record.adminArea;
+      latitude        = record.latitude;
+      longitude       = record.longitude;
+      createdAt       = record.createdAt;
+      varieties       = record.varieties;
+      farmSize        = record.farmSize;
+      coffeeTreeCount = record.coffeeTreeCount;
+      shadeTreePct    = record.shadeTreePct;
+      sequenceNumber  = seq;
+      areaCode        = null;
+    });
+    seq
   };
 
   public query func getFarmRecord(farmId : Text) : async FarmRecord {
-    switch (farmRecords_v2.get(farmId)) {
+    switch (farmRecords_v3.get(farmId)) {
       case (?record) { record };
       case (null) {
-        // Fall back to v1 data migrated inline
-        switch (farmRecords.get(farmId)) {
-          case (null) { Runtime.trap("Farm record not found") };
+        // Fall back to v2
+        switch (farmRecords_v2.get(farmId)) {
           case (?v) {{
-            farmerName    = v.farmerName;
-            corporateName = v.corporateName;
-            phoneNumber   = v.phoneNumber;
-            commodity     = v.commodity;
-            grade         = v.grade;
-            adminArea     = v.adminArea;
-            latitude      = v.latitude;
-            longitude     = v.longitude;
-            createdAt     = v.createdAt;
-            varieties     = null;
-            farmSize      = null;
-            coffeeTreeCount = null;
-            shadeTreePct  = null;
+            farmerName      = v.farmerName;
+            corporateName   = v.corporateName;
+            phoneNumber     = v.phoneNumber;
+            commodity       = v.commodity;
+            grade           = v.grade;
+            adminArea       = v.adminArea;
+            latitude        = v.latitude;
+            longitude       = v.longitude;
+            createdAt       = v.createdAt;
+            varieties       = v.varieties;
+            farmSize        = v.farmSize;
+            coffeeTreeCount = v.coffeeTreeCount;
+            shadeTreePct    = v.shadeTreePct;
+            sequenceNumber  = 0;
+            areaCode        = null;
           }};
+          case (null) {
+            // Fall back to v1
+            switch (farmRecords.get(farmId)) {
+              case (null) { Runtime.trap("Farm record not found") };
+              case (?v) {{
+                farmerName      = v.farmerName;
+                corporateName   = v.corporateName;
+                phoneNumber     = v.phoneNumber;
+                commodity       = v.commodity;
+                grade           = v.grade;
+                adminArea       = v.adminArea;
+                latitude        = v.latitude;
+                longitude       = v.longitude;
+                createdAt       = v.createdAt;
+                varieties       = null;
+                farmSize        = null;
+                coffeeTreeCount = null;
+                shadeTreePct    = null;
+                sequenceNumber  = 0;
+                areaCode        = null;
+              }};
+            };
+          };
         };
       };
     };
@@ -187,10 +276,47 @@ actor {
     if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
       Runtime.trap("Unauthorized: Only admins can access all farm records");
     };
-    farmRecords_v2.values().toArray().sort(FarmRecord.compareByFarmerName);
+    farmRecords_v3.values().toArray().sort(FarmRecord.compareByFarmerName);
   };
 
-  // ── QR Scan Tracking ───────────────────────────────────────────────────────
+  // Returns [(farmId, FarmRecord)] so admin can reference records by ID
+  public query ({ caller }) func getAllFarmRecordsWithIds() : async [(Text, FarmRecord)] {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Only admins can access all farm records");
+    };
+    farmRecords_v3.entries().toArray();
+  };
+
+  // Admin sets the area code (alphabet prefix) for a registered farm
+  public shared ({ caller }) func setFarmAreaCode(farmId : Text, code : Text) : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Only admins can set area codes");
+    };
+    switch (farmRecords_v3.get(farmId)) {
+      case (null) { Runtime.trap("Farm record not found") };
+      case (?record) {
+        farmRecords_v3.add(farmId, {
+          farmerName      = record.farmerName;
+          corporateName   = record.corporateName;
+          phoneNumber     = record.phoneNumber;
+          commodity       = record.commodity;
+          grade           = record.grade;
+          adminArea       = record.adminArea;
+          latitude        = record.latitude;
+          longitude       = record.longitude;
+          createdAt       = record.createdAt;
+          varieties       = record.varieties;
+          farmSize        = record.farmSize;
+          coffeeTreeCount = record.coffeeTreeCount;
+          shadeTreePct    = record.shadeTreePct;
+          sequenceNumber  = record.sequenceNumber;
+          areaCode        = ?code;
+        });
+      };
+    };
+  };
+
+  // ── QR Scan Tracking ───────────────────────────────────────────────────────────────
   public shared func logScan(farmId : Text, userAgent : Text) : async () {
     let deviceType = getDeviceType(userAgent);
     let scanEvent : ScanEvent = {
@@ -226,7 +352,7 @@ actor {
       .sort(ScanEvent.compareByTimestamp);
   };
 
-  // ── QR Logo ───────────────────────────────────────────────────────────────
+  // ── QR Logo ───────────────────────────────────────────────────────────────────────
   public query func getQrLogoUrl() : async Text {
     qrLogoUrl
   };
@@ -238,7 +364,7 @@ actor {
     qrLogoUrl := url;
   };
 
-  // ── Helpers ────────────────────────────────────────────────────────────────
+  // ── Helpers ────────────────────────────────────────────────────────────────────
   func getDeviceType(ua : Text) : Text {
     if      (ua.contains(#text "iPhone"))  { "iPhone"  }
     else if (ua.contains(#text "Android")) { "Android" }

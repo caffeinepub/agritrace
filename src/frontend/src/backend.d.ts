@@ -21,6 +21,8 @@ export interface FarmRecord {
     farmSize: string | null;
     coffeeTreeCount: string | null;
     shadeTreePct: string | null;
+    sequenceNumber: bigint;
+    areaCode: string | null;
 }
 export interface ScanEvent {
     timestamp: bigint;
@@ -43,9 +45,10 @@ export enum UserRole {
     guest = "guest"
 }
 export interface backendInterface {
-    addFarmRecord(farmId: string, record: FarmRecord): Promise<void>;
+    addFarmRecord(farmId: string, record: FarmRecord): Promise<bigint>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     getAllFarmRecords(): Promise<Array<FarmRecord>>;
+    getAllFarmRecordsWithIds(): Promise<Array<[string, FarmRecord]>>;
     getAllScanStats(): Promise<Array<ScanEvent>>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
@@ -55,4 +58,5 @@ export interface backendInterface {
     isCallerAdmin(): Promise<boolean>;
     logScan(farmId: string, userAgent: string): Promise<void>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
+    setFarmAreaCode(farmId: string, code: string): Promise<void>;
 }
